@@ -8,7 +8,7 @@ namespace RikusGameDevToolbox.Discrete3d
 {
     /// <summary>
     /// Stores objects with Vec position. Several objects can be in one
-    /// position. Objects are stored in array for speed.
+    /// position. Objects are stored in array for duration.
     /// </summary>
     public class PositionArray<T> where T : class
     {

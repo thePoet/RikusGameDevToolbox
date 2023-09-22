@@ -6,6 +6,13 @@ namespace RikusGameDevToolbox.GeneralUse
 {
     public static class UnityExtensionMethods
     {
+        public static float Get(this Vector3 v, Dimension3d dimension)
+        {
+            if (dimension == Dimension3d.X) return v.x;
+            if (dimension == Dimension3d.Y) return v.y;
+            return v.z;
+        }
+        
         public static Vector2 Vec2XY(this Vector3 v)
         {
             return new Vector2(v.x, v.y);
@@ -19,6 +26,20 @@ namespace RikusGameDevToolbox.GeneralUse
         public static Vector2 Vec2YZ(this Vector3 v)
         {
             return new Vector2(v.y, v.z);
+        }
+
+        public static Vector2 ProjectionOn(this Vector2 v, Vector2 on)
+        {
+            // TODO: Optimize
+            Vector3 result = Vector3.Project(v, on);
+            return result;
+        }
+        
+        public static Vector2 RejectionOn(this Vector2 v, Vector2 on)
+        {
+            // TODO: Optimize
+            Vector3 result = Vector3.Project(v, on);
+            return v - (Vector2)result;
         }
 
 
@@ -36,6 +57,14 @@ namespace RikusGameDevToolbox.GeneralUse
         {
             return new Vector3(v.x, v.y, value);
         }
+        
+        public static Vector3 Set(this Vector3 v, Dimension3d dimension, float value)
+        {
+            if (dimension == Dimension3d.X) return SetX(v, value);
+            if (dimension == Dimension3d.Y) return SetY(v, value);
+            return SetZ(v, value);
+        }
+
 
         public static Vector3 AddToX(this Vector3 v, float value)
         {
@@ -119,8 +148,6 @@ namespace RikusGameDevToolbox.GeneralUse
             int numChildren = go.transform.childCount;
             for (int i = 0; i < numChildren; i++)
                 result.AddRange(go.transform.GetChild(i).gameObject.RecursiveFindAll(name, prefix));
-
-
 
 
             return result.ToArray();

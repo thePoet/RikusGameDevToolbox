@@ -9,7 +9,6 @@ namespace RikusGameDevToolbox.GeneralUse
             return Quaternion.Euler(0, rotation, 0) * Vector3.forward;
         }
 
-
         public static Vector3 DirectionTransform(Vector3 direction, Transform from, Transform to)
         {
             Vector3 inWorld = from.TransformDirection(direction);
@@ -45,7 +44,6 @@ namespace RikusGameDevToolbox.GeneralUse
         {
             return ForwardVecWithYRot(polarAngle);
         }
-
 
         public static float AddPolarAngles(float angle1, float angle2)
         {

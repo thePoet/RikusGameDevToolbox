@@ -4,12 +4,10 @@ namespace RikusGameDevToolbox.GeneralUse
 {
     public static class Math2d
     {
-
         public static Vector2 Rotate(Vector2 v, float degrees)
         {
             return Quaternion.Euler(0, 0, degrees) * v;
         }
-
 
         // Returns signed angle between vectors
         // (Untested)
@@ -20,6 +18,7 @@ namespace RikusGameDevToolbox.GeneralUse
             return Vector2.Angle(v1, v2) * sign;
         }
 
+        // TODO: Move to Angle and simplify
         public static float ClampAngle(float angle, float min, float max)
         {
             angle = Mathf.Repeat(angle, 360);
@@ -65,7 +64,7 @@ namespace RikusGameDevToolbox.GeneralUse
             return angle;
         }
 
-        // Return an angle of triangle (in degrees) when given lenghts of three sides
+        // Return an angle of triangle (in degrees) when given lengths of three sides
         public static float SolveAngle(float sideAgainst, float sideNextA, float sideNextB)
         {
             return Mathf.Acos((sideNextA * sideNextA + sideNextB * sideNextB - sideAgainst * sideAgainst)
@@ -76,6 +75,7 @@ namespace RikusGameDevToolbox.GeneralUse
 
         // Clamps the angle to the closest constraint
         // TODO: Is this the same as above?
+        // Move to Angle or delete
         public static float ClampAngleToClosest(float angle, float min, float max)
         {
             if (AngleIncrement(angle, max) < AngleIncrement(angle, min))
