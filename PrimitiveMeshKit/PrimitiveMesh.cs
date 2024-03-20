@@ -25,7 +25,7 @@ namespace RikusGameDevToolbox.PrimitiveMeshKit
         {
             if (mode == Mode.SINGLE_MATERIAL)
             {
-                throw new System.Exception("Single Material Mode not implemented.");
+                throw new System.Exception("Single Substance Mode not implemented.");
             }
             this.mode = mode;
 

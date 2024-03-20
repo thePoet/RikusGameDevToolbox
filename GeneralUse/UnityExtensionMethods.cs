@@ -6,6 +6,8 @@ namespace RikusGameDevToolbox.GeneralUse
 {
     public static class UnityExtensionMethods
     {
+     
+        
         public static float Get(this Vector3 v, Dimension3d dimension)
         {
             if (dimension == Dimension3d.X) return v.x;
@@ -42,6 +44,14 @@ namespace RikusGameDevToolbox.GeneralUse
             return v - (Vector2)result;
         }
 
+        public static Vector2 SetX(this Vector2 v, float value)
+        {
+            return new Vector2(value, v.y);
+        }
+        public static Vector2 SetY(this Vector2 v, float value)
+        {
+            return new Vector2(v.x, value);
+        }
 
         public static Vector3 SetX(this Vector3 v, float value)
         {

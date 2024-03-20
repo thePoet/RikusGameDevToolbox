@@ -1,20 +1,14 @@
-﻿using System.Collections;
-using System.Collections.Generic;
-using UnityEngine;
-
+﻿
 namespace RikusGameDevToolbox.GeneralUse
 {
 
 
     public class Timer
     {
-        public float startTime { get; private set; }
+        public float StartTime { get; private set; }
 
-        public float timeSinceStart
-        {
-            get { return TimeSinceStart(); }
-            private set { }
-        }
+        // Returns the seconds since the Timer has been started/reset.
+        public float Time => TimeSinceStart();
 
 
         public Timer()
@@ -24,12 +18,12 @@ namespace RikusGameDevToolbox.GeneralUse
 
         public void Reset()
         {
-            startTime = Time.realtimeSinceStartup;
+            StartTime = UnityEngine.Time.realtimeSinceStartup;
         }
 
         float TimeSinceStart()
         {
-            return Time.realtimeSinceStartup - startTime;
+            return UnityEngine.Time.realtimeSinceStartup - StartTime;
         }
 
     }

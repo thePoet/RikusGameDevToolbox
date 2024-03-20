@@ -94,6 +94,34 @@ namespace RikusGameDevToolbox.GeneralUse
                 dif += 360f;
             return dif;
         }
+        
+        // Written by AI, not tested
+        public static Vector2 LineIntersectionWithCircle(Vector2 linePointA, Vector2 linePointB, Vector2 center, float radius)
+        {
+            Vector2 d = linePointB - linePointA;
+            Vector2 f = linePointA - center;
+            float a = Vector2.Dot(d, d);
+            float b = 2 * Vector2.Dot(f, d);
+            float c = Vector2.Dot(f, f) - radius * radius;
+            float discriminant = b * b - 4 * a * c;
+            if (discriminant < 0)
+            {
+                return Vector2.positiveInfinity;
+            }
+            discriminant = Mathf.Sqrt(discriminant);
+            float t1 = (-b - discriminant) / (2 * a);
+            float t2 = (-b + discriminant) / (2 * a);
+            if (t1 >= 0 && t1 <= 1)
+            {
+                return linePointA + t1 * d;
+            }
+            if (t2 >= 0 && t2 <= 1)
+            {
+                return linePointA + t2 * d;
+            }
+            return Vector2.positiveInfinity;
+                
+        }
 
     }
 

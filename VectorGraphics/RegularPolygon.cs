@@ -2,7 +2,7 @@ using System.Collections.Generic;
 using RikusGameDevToolbox.VectorGraphics;
 using UnityEngine;
 
-namespace RikusGameDevToolbox.VectorGßraphics
+namespace RikusGameDevToolbox.VectorGraphics
 {
 
     [ExecuteInEditMode]

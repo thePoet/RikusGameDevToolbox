@@ -2,6 +2,8 @@
 
 // Collection of very broad use C# functions
 
+using System.Collections.Generic;
+
 namespace RikusGameDevToolbox.GeneralUse
 {
     public static class Generic
@@ -19,6 +21,14 @@ namespace RikusGameDevToolbox.GeneralUse
             if (index >= NumEnumerators<T>())
                 return null;
             return System.Enum.GetNames(typeof(T))[index];
+        }
+        
+        public static IEnumerable<(T, int)> ReverseIterate<T>(List<T> list)
+        {
+            for (int i = list.Count - 1; i >= 0; i--)
+            {
+                yield return (list[i], i);
+            }
         }
 
     }
