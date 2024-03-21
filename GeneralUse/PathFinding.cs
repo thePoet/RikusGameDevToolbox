@@ -16,7 +16,7 @@ namespace RikusGameDevToolbox.GeneralUse
             public T Node; 
             public float DistanceToStart; // Distance from start to this node
             public float DistanceEstimateToGoal; // Estimated distance from this position to goal
-            public NodeTag parent; // NodeTag that is the first step of
+            public NodeTag Parent; // NodeTag that is the first step of
                                    // the fastest known wa to the start.
 
             public float SumDistances => DistanceToStart + DistanceEstimateToGoal;
@@ -26,9 +26,9 @@ namespace RikusGameDevToolbox.GeneralUse
 
         public delegate IEnumerable<T> TraversableNeighbours(T node);
 
-        private MovementCost _movementCost;
-        private MovementCost _movementCostEstimate;
-        private TraversableNeighbours _traversableNeighbours;
+        private readonly MovementCost _movementCost;
+        private readonly MovementCost _movementCostEstimate;
+        private readonly TraversableNeighbours _traversableNeighbours;
 
        
         
@@ -55,9 +55,7 @@ namespace RikusGameDevToolbox.GeneralUse
             Dictionary<T, NodeTag> tags = new Dictionary<T, NodeTag>();
 
             open.Add(start);
-            tags.Add(start, new NodeTag() { Node = start, DistanceToStart = 0, parent = null });
-
-
+            tags.Add(start, new NodeTag() { Node = start, DistanceToStart = 0, Parent = null });
 
             while (open.Count > 0)
             {
@@ -66,7 +64,7 @@ namespace RikusGameDevToolbox.GeneralUse
                 open.Remove(n.Node);
             
 
-                if (n.Node.Equals(goal)) return PathToStartFrom(n);
+                if (n.Node.Equals(goal)) return PathFromStartTo(n);
                 
 
                 foreach (var neighbour in _traversableNeighbours(n.Node))
@@ -82,7 +80,7 @@ namespace RikusGameDevToolbox.GeneralUse
                             Node = neighbour,
                             DistanceToStart = distanceToStart,
                             DistanceEstimateToGoal = _movementCostEstimate(neighbour, goal),
-                            parent = n
+                            Parent = n
                         };
                         tags.Add(neighbour, tag);
                         open.Add(neighbour);
@@ -92,7 +90,7 @@ namespace RikusGameDevToolbox.GeneralUse
                     if (n.DistanceToStart > distanceToStart)
                     {
                         n.DistanceToStart = distanceToStart;
-                        n.parent = n;
+                        n.Parent = n;
                     }
 
                 }
@@ -100,33 +98,33 @@ namespace RikusGameDevToolbox.GeneralUse
             return null;
 
             // Returns node with shortest estimated distance from start to goal from the List
-            NodeTag NodeWithShortestDistance(List<T> list)
+            NodeTag NodeWithShortestDistance(IReadOnlyList<T> nodeTagList)
             {
                 float smallestF = float.PositiveInfinity;
                 T node = default(T);
 
-                for (int i = 0; i < list.Count; i++)
+                foreach (var tag in nodeTagList)
                 {
-                    float f  = tags[list[i]].SumDistances;
+                    float f  = tags[tag].SumDistances;
                     if (f < smallestF)
                     {
                         smallestF = f;
-                        node = list[i];
+                        node = tag;
                     }
                 }
-
-                return tags[node];
+                if (node != null) return tags[node];
+                return null;
             }
             
-            List<T> PathToStartFrom(NodeTag nodeTag)
+            // Returns a list of nodes from the start to the given node
+            List<T> PathFromStartTo(NodeTag nodeTag)
             {
-                List<T> result = new List<T>();
-                result.Add(nodeTag.Node);
+                List<T> result = new List<T> { nodeTag.Node };
 
-                while (nodeTag.parent != null)
+                while (nodeTag.Parent != null)
                 {
-                    result.Insert(0, nodeTag.parent.Node);
-                    nodeTag = nodeTag.parent;
+                    result.Insert(0, nodeTag.Parent.Node);
+                    nodeTag = nodeTag.Parent;
                 }
                 return result;
             }
