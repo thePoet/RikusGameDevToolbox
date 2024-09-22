@@ -1,11 +1,18 @@
 using System;
 using System.Collections.Generic;
-
+using System.Linq;
+using Unity.VisualScripting;
+using UnityEditor;
 
 
 namespace RikusGameDevToolbox.GeneralUse
 {
-    // Implements A* algorithm to find shortest path between nodes of the type T
+
+    /// <summary>
+    /// Implements A* algorithm to find shortest path between nodes of the type T.
+    /// Not particularly efficient, but works for small graphs.
+    /// </summary>
+    /// <typeparam name="T"></typeparam>
     public class PathFinding<T> where T : IEquatable<T>
     {
         // Information attached to each node for the purpose
@@ -20,6 +27,32 @@ namespace RikusGameDevToolbox.GeneralUse
                                    // the fastest known wa to the start.
 
             public float SumDistances => DistanceToStart + DistanceEstimateToGoal;
+        }
+
+        private class NodeList
+        {
+            private readonly Dictionary<int, T> _nodes = new();
+
+            public void Add(T node) => _nodes.Add(node.GetHashCode(), node);
+            public void Remove(T node) => _nodes.Remove(node.GetHashCode());
+            public bool Contains(T node) => _nodes.ContainsKey(node.GetHashCode());
+            public int Count => _nodes.Count;
+            public T Pop()
+            {
+                var first = _nodes.First();
+                _nodes.Remove(first.Key);
+                return first.Value;
+            }
+            
+            public List<T> AsList()
+            {
+                List<T> result = new();
+                foreach (var node in _nodes.Values)
+                {
+                    result.Add(node);
+                }
+                return result;
+            }
         }
 
         public delegate float MovementCost(T from, T to);
@@ -45,13 +78,12 @@ namespace RikusGameDevToolbox.GeneralUse
             _movementCostEstimate = movementCostEstimate;
         }
 
-        // Return a path between given position as a list
-        // of positions, including the start and goal.
+        // Return a path between given position as a list of positions, including the start and goal.
         // Returns null if no path is found.
         public List<T> GetPath(T start, T goal, float maxDistance = float.PositiveInfinity)
         {
-            List<T> open = new List<T>();
-            List<T> closed = new List<T>();
+            NodeList open = new();
+            NodeList closed = new();
             Dictionary<T, NodeTag> tags = new Dictionary<T, NodeTag>();
 
             open.Add(start);
@@ -69,11 +101,11 @@ namespace RikusGameDevToolbox.GeneralUse
 
                 foreach (var neighbour in _traversableNeighbours(n.Node))
                 {
-                    if (IsInClosedList(neighbour)) continue;
+                    if (closed.Contains(neighbour)) continue;
                     float distanceToStart = n.DistanceToStart + _movementCost(n.Node, neighbour);
                     if (distanceToStart > maxDistance) continue;
                     
-                    if (!IsInOpenList(neighbour))
+                    if (!open.Contains(neighbour))
                     {
                         NodeTag tag = new NodeTag()
                         {
@@ -98,21 +130,22 @@ namespace RikusGameDevToolbox.GeneralUse
             return null;
 
             // Returns node with shortest estimated distance from start to goal from the List
-            NodeTag NodeWithShortestDistance(IReadOnlyList<T> nodeTagList)
+            // INEFFICIENT!
+            NodeTag NodeWithShortestDistance(NodeList nodeTagList)
             {
                 float smallestF = float.PositiveInfinity;
-                T node = default(T);
+                T shortest = default(T);
 
-                foreach (var tag in nodeTagList)
+                foreach (var node in nodeTagList.AsList())
                 {
-                    float f  = tags[tag].SumDistances;
+                    float f  = tags[node].SumDistances;
                     if (f < smallestF)
                     {
                         smallestF = f;
-                        node = tag;
+                        shortest = node;
                     }
                 }
-                if (node != null) return tags[node];
+                if (shortest != null) return tags[shortest];
                 return null;
             }
             
@@ -128,9 +161,33 @@ namespace RikusGameDevToolbox.GeneralUse
                 }
                 return result;
             }
-            
-            bool IsInClosedList(T node) => closed.IndexOf(node) != -1;
-            bool IsInOpenList(T node) => open.IndexOf(node) != -1;
+           
+       
         }
+
+        /// <summary>
+        /// Includes the given node.
+        /// </summary>
+        public List<T> GetAllNodesConnectedTo(T node)
+        {
+            NodeList open = new(); 
+            NodeList closed = new();
+
+            open.Add(node);
+
+            while (open.Count > 0)
+            {
+                node = open.Pop();
+                closed.Add(node);
+
+                foreach (var neighbour in _traversableNeighbours(node))
+                {
+                    if (!open.Contains(neighbour) && !closed.Contains(neighbour)) open.Add(neighbour);
+                }
+            }
+            return closed.AsList();
+        }
+        
+
     }
 }

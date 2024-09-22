@@ -43,36 +43,26 @@ namespace RikusGameDevToolbox.GeneralUse
             Vector3 result = Vector3.Project(v, on);
             return v - (Vector2)result;
         }
-
-        public static Vector2 SetX(this Vector2 v, float value)
+       
+        public static Vector2 With(this Vector2 vector, float? x = null, float? y = null)
         {
-            return new Vector2(value, v.y);
+            return new Vector2(x ?? vector.x, y ?? vector.y);
         }
-        public static Vector2 SetY(this Vector2 v, float value)
+        
+        public static Vector3 With(this Vector3 vector, float? x = null, float? y = null, float? z = null)
         {
-            return new Vector2(v.x, value);
-        }
-
-        public static Vector3 SetX(this Vector3 v, float value)
-        {
-            return new Vector3(value, v.y, v.z);
+            return new Vector3(x ?? vector.x, y ?? vector.y, z ?? vector.z);
         }
 
-        public static Vector3 SetY(this Vector3 v, float value)
-        {
-            return new Vector3(v.x, value, v.z);
-        }
+     
 
-        public static Vector3 SetZ(this Vector3 v, float value)
-        {
-            return new Vector3(v.x, v.y, value);
-        }
+
         
         public static Vector3 Set(this Vector3 v, Dimension3d dimension, float value)
         {
-            if (dimension == Dimension3d.X) return SetX(v, value);
-            if (dimension == Dimension3d.Y) return SetY(v, value);
-            return SetZ(v, value);
+            if (dimension == Dimension3d.X) return v.With(x: value);
+            if (dimension == Dimension3d.Y) return v.With(y: value);
+            return v.With(z: value);
         }
 
 
@@ -91,16 +81,10 @@ namespace RikusGameDevToolbox.GeneralUse
             return new Vector3(v.x, v.y, v.z + value);
         }
 
-
         public static Vector3Int ToVector3Int(this Vector3 v)
         {
             return new Vector3Int(Mathf.RoundToInt(v.x), Mathf.RoundToInt(v.y), Mathf.RoundToInt(v.z));
         }
-
-
-
-
-
 
         public static void CopyLocalValuesFrom(this Transform t, Transform other)
         {

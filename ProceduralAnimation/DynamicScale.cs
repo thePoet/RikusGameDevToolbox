@@ -53,9 +53,9 @@ namespace RikusGameDevToolbox.ProceduralAnimation
             dynamics.Input = target.localScale;
             dynamics.Update(Time.deltaTime);
             
-            if (followTargetX) transform.localScale = transform.localScale.SetX(dynamics.Output.x);
-            if (followTargetY) transform.localScale = transform.localScale.SetY(dynamics.Output.y); 
-            if (followTargetZ) transform.localScale = transform.localScale.SetZ(dynamics.Output.z);
+            if (followTargetX) transform.localScale = transform.localScale.With( x: dynamics.Output.x);
+            if (followTargetY) transform.localScale = transform.localScale.With( y: dynamics.Output.y); 
+            if (followTargetZ) transform.localScale = transform.localScale.With( z: dynamics.Output.z);
             
             if (HasArrived() && _actionAfterArrival != null)
             {

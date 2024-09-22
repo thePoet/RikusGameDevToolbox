@@ -83,9 +83,9 @@ namespace RikusGameDevToolbox.ProceduralAnimation
             dynamics.Input = TargetPosition;
             dynamics.Update(Time.deltaTime);
             
-            if (followTargetX) CurrentPosition = CurrentPosition.SetX(dynamics.Output.x);
-            if (followTargetY) CurrentPosition = CurrentPosition.SetY(dynamics.Output.y); 
-            if (followTargetZ) CurrentPosition = CurrentPosition.SetZ(dynamics.Output.z);
+            if (followTargetX) CurrentPosition = CurrentPosition.With( x:dynamics.Output.x);
+            if (followTargetY) CurrentPosition = CurrentPosition.With( y:dynamics.Output.y); 
+            if (followTargetZ) CurrentPosition = CurrentPosition.With( z:dynamics.Output.z);
 
             if (HasArrived() && _actionAfterArrival != null)
             {

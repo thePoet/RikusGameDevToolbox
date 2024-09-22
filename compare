@@ -1,0 +1,2 @@
+#!/bin/sh
+diff -r -x '*.meta' -x '.git' -x '.gitignore' -x '.DS_Store' . ~/Documents/GitHub/RikusGameDevToolbox/

@@ -23,7 +23,15 @@ namespace RikusGameDevToolbox.GeneralUse
             return System.Enum.GetNames(typeof(T))[index];
         }
         
-        public static IEnumerable<(T, int)> ReverseIterate<T>(List<T> list)
+        public static IEnumerable<T> ReverseIterate<T>(List<T> list)
+        {
+            for (int i = list.Count - 1; i >= 0; i--)
+            {
+                yield return list[i];
+            }
+        }
+        
+        public static IEnumerable<(T, int)> ReverseIterateWithIndex<T>(List<T> list)
         {
             for (int i = list.Count - 1; i >= 0; i--)
             {
