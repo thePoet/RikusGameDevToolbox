@@ -14,7 +14,7 @@ namespace RikusGameDevToolbox.GeneralUse
         {
             return System.Enum.GetNames(typeof(T)).Length;
         }
-
+        
         // Returns name as string for an enumerator with given index in an enum type.
         public static string EnumeratorName<T>(int index)
         {
