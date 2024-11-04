@@ -3,9 +3,10 @@ using System.Collections.Generic;
 
 namespace RikusGameDevToolbox.GeneralUse
 {
-    // This collection can be used like Dictionary, but the data is held in an array in continuous fashion.
-    // The array can be accessed directly via Span.
-    
+    /// <summary>
+    /// This collection can be used like Dictionary, but the data is held in an array in continuous fashion.
+    /// The array can be accessed directly via Span.
+    /// </summary>
     public class SpannableDictionary<TKey, TValue>
     {
         private Dictionary<TKey, int> _KeyToIndex;
@@ -20,7 +21,6 @@ namespace RikusGameDevToolbox.GeneralUse
             _IndexToKey = new Dictionary<int, TKey>();
             _array = new TValue[maxNumEntries];
         }
-
 
         public TValue Get(TKey key)
         {
@@ -42,7 +42,6 @@ namespace RikusGameDevToolbox.GeneralUse
             value = default;
             return false;
         }
-    
         
         public void Add(TKey key, TValue value)
         {
