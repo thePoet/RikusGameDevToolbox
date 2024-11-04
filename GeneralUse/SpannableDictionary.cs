@@ -27,6 +27,23 @@ namespace RikusGameDevToolbox.GeneralUse
             return _array[_KeyToIndex[key]];
         }
         
+        public bool ContainsKey(TKey key)
+        {
+            return _KeyToIndex.ContainsKey(key);
+        }
+        
+        public bool TryGetValue(TKey key, out TValue value)
+        {
+            if (_KeyToIndex.TryGetValue(key, out int index))
+            {
+                value = _array[index];
+                return true;
+            }
+            value = default;
+            return false;
+        }
+    
+        
         public void Add(TKey key, TValue value)
         {
             int index = _KeyToIndex.Count;
