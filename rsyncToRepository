@@ -1,0 +1,1 @@
+rsync  -avh --exclude '*.meta' --exclude '.git' --exclude '.gitignore' --exclude '.DS_Store' ../RikusGameDevToolbox ~/Documents/GitHub/
