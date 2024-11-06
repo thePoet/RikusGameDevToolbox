@@ -27,7 +27,7 @@ namespace RikusGameDevToolbox.GeneralUse
             return _array[_KeyToIndex[key]];
         }
         
-        public bool ContainsKey(TKey key)
+        public bool Contains(TKey key)
         {
             return _KeyToIndex.ContainsKey(key);
         }
