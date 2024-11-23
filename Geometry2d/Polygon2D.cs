@@ -6,9 +6,10 @@ using UnityEngine;
 
 namespace RikusGameDevToolbox.Geometry2d
 {
-    // A polygon in 2D space without holes. 
+    /// A polygon in 2D space
+    /// Holes, self-intersections and duplicate points are not allowed.
     [Serializable]
-    public struct Polygon2D
+    public struct Polygon2D : IEquatable<Polygon2D>
     {
         
         // An intersection of the outlines of two Polygon2D:s.
@@ -32,7 +33,7 @@ namespace RikusGameDevToolbox.Geometry2d
         
         
         /// <summary>
-        /// Constructor for a polygon with the given _points.
+        /// Constructor for a polygon with the given points.
         /// </summary>
         /// <param name="points">Points of the of polygon in clockwise order.</param>
         public Polygon2D(IEnumerable<Vector2> points)
@@ -41,7 +42,7 @@ namespace RikusGameDevToolbox.Geometry2d
         }
 
         /// <summary>
-        /// Is given point inside the polygon?
+        /// Is a point inside the polygon?
         /// </summary>
         public bool IsPointInside(Vector2 point)
         {
@@ -65,21 +66,21 @@ namespace RikusGameDevToolbox.Geometry2d
             return result;
         }
         
-        public IEnumerable<(Vector2, Vector2)> Edges()
+        public IEnumerable<Edge> Edges()
         {
             foreach ((int a, int b) in PointIndicesForEdges())
             {
-                yield return  (_points[a], _points[b]);
+                yield return new Edge(_points[a], _points[b]);
             }
         }
 
         public bool IsOutlineIntersecting(Polygon2D other)
         {
-            foreach ((Vector2 a1, Vector2 a2) in Edges())
+            foreach (var e1 in Edges())
             {
-                foreach ((Vector2 b1, Vector2 b2) in other.Edges())
+                foreach (var e2 in other.Edges())
                 {
-                    if (Math2d.AreLineSegmentsIntersecting(a1, a2, b1, b2)) return true;
+                    if (Math2d.AreLineSegmentsIntersecting(e1.Point1, e1.Point2, e2.Point1, e2.Point2)) return true;
                 }
             }
 
@@ -187,6 +188,21 @@ namespace RikusGameDevToolbox.Geometry2d
      
         }
         
+        public bool Equals(Polygon2D other)
+        {
+            bool sameNumberOfPoints = _points.Count == other._points.Count;
+            bool samePoints = _points.All(point => other._points.Contains(point));
+            return sameNumberOfPoints && samePoints;
+        }
+
+        public override bool Equals(object obj) => obj is Polygon2D other && Equals(other);
+        public static bool operator == (Polygon2D p1, Polygon2D p2) => p1.Equals(p2);
+        public static bool operator != (Polygon2D p1, Polygon2D p2) => !p1.Equals(p2);
+        
+        public override int GetHashCode()
+        {
+            return (_points != null ? _points.GetHashCode() : 0);
+        }
         
         #endregion
 
@@ -264,5 +280,8 @@ namespace RikusGameDevToolbox.Geometry2d
 
         #endregion
 
+        
+        
+        
     }
 }
