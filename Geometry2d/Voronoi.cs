@@ -1,4 +1,5 @@
 using System;
+using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
 using RikusGameDevToolbox.Geometry2d.DelaunayVoronoi;
@@ -10,6 +11,7 @@ namespace RikusGameDevToolbox.Geometry2d
     {
         private List<VoronoiCell> _cells;
         private List<Edge> _edges;
+        private List<Triangle> _delaunayTriangles;
         
         #region ------------------------------------------ PUBLIC METHODS -----------------------------------------------
         
@@ -19,9 +21,16 @@ namespace RikusGameDevToolbox.Geometry2d
             var cellCenters = points.Select(p => new Point(p.x, p.y));
 
             var dt = new DelaunayTriangulator();
-            var triangles = new List<Triangle>(dt.BowyerWatson(cellCenters));
+            var triangles = new List<DelaunayVoronoi.Triangle>(dt.BowyerWatson(cellCenters));
 
+            
             GenerateFromDelaunay(triangles, useCentroids);
+
+            _delaunayTriangles = new List<Triangle>();
+            foreach (var t in triangles)
+            {
+                _delaunayTriangles.Add(new Triangle(t.Vertices[0].AsVector2, t.Vertices[1].AsVector2, t.Vertices[2].AsVector2));
+            }
 
           
         }
@@ -36,20 +45,15 @@ namespace RikusGameDevToolbox.Geometry2d
        
         }*/
 
-        public List<VoronoiCell> Cells()
-        {
-            return _cells;
-        } 
-        
-        public List<Edge> Edges()
-        {
-            return _edges;
-        } 
+        public List<VoronoiCell> Cells() => _cells;
+        public List<Edge> Edges() => _edges;
+        public List<Triangle> DelaunayTriangles() => _delaunayTriangles;
+
         #endregion
 
         #region ------------------------------------------ PRIVATE METHODS ----------------------------------------------
         
-        private void GenerateFromDelaunay(IEnumerable<Triangle> triangulation, bool useCentroids)
+        private void GenerateFromDelaunay(IEnumerable<DelaunayVoronoi.Triangle> triangulation, bool useCentroids)
         {
             var voronoiEdges = new HashSet<Edge>();
             
@@ -58,7 +62,7 @@ namespace RikusGameDevToolbox.Geometry2d
             foreach (var triangle in triangulation)
             {
                 var tct = TriangleCenter(triangle);
-                foreach (Triangle neighbour in triangle.TrianglesWithSharedEdge)
+                foreach (DelaunayVoronoi.Triangle neighbour in triangle.TrianglesWithSharedEdge)
                 {
                     var tcn = TriangleCenter(neighbour);
                     voronoiEdges.Add(new Edge(tct, tcn));
@@ -78,7 +82,7 @@ namespace RikusGameDevToolbox.Geometry2d
                 Vector2 center = kvp.Key;
                 _cells.Add(new VoronoiCell(poly, center));
             }
-            Vector2 TriangleCenter(Triangle t)
+            Vector2 TriangleCenter(DelaunayVoronoi.Triangle t)
             {
                 if (useCentroids) return t.Centroid();
                 return (t.Circumcenter.AsVector2);
@@ -98,5 +102,6 @@ namespace RikusGameDevToolbox.Geometry2d
         
         #endregion
 
+       
     }
 }
