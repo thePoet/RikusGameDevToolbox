@@ -30,7 +30,25 @@ namespace RikusGameDevToolbox.Geometry2d
 
         #region ------------------------------------------ PUBLIC METHODS -----------------------------------------------
         
-        
+        /// <summary>
+        /// Attemps to creates a polygon from the given unordered points. Works if the polygon is convex or nearly so.
+        /// </summary>
+        public static Polygon2D FromUnorderedPoints(IEnumerable<Vector2> points)
+        {
+            var list = points.ToList();
+            Vector2 center = new Vector2(list.Average(p => p.x), list.Average(p => p.y));
+            
+            list.Sort(SortByAngle);
+            return new Polygon2D( list );
+            
+            int SortByAngle(Vector2 p1, Vector2 p2)
+            {
+                float angle1 = Math2d.GetAngle(Vector2.up, p1-center);
+                float angle2 = Math2d.GetAngle(Vector2.up, p2-center);
+                return angle1.CompareTo(angle2);
+            }
+   
+        }
         
         /// <summary>
         /// Constructor for a polygon with the given points.
@@ -118,7 +136,7 @@ namespace RikusGameDevToolbox.Geometry2d
             {
                 foreach (var theirPoint in other._points)
                 {
-                    if (Vector2.Distance(myPoint, theirPoint) < 0.000001f) result++;
+                    if (myPoint==theirPoint) result++;
                 }
             }
             return result;
@@ -141,7 +159,6 @@ namespace RikusGameDevToolbox.Geometry2d
                 intersections.Insert(0, intersections[^1]);
                 intersections.RemoveAt(intersections.Count - 1);
             }
-
 
             return CutBetweenIntersections(intersections[0], intersections[1], this);
 
@@ -211,15 +228,11 @@ namespace RikusGameDevToolbox.Geometry2d
         private static List<OutlineIntersection> OutlineIntersections(Polygon2D a, Polygon2D b)
         {
             List<OutlineIntersection> intersections = new List<OutlineIntersection>();
-
-         
             
             foreach ((int a1, int a2) in a.PointIndicesForEdges())
             {
                 foreach ((int b1, int b2) in b.PointIndicesForEdges())
                 {
-                   
-                    
                     var result = Math2d.LineSegmentIntersection(a._points[a1], a._points[a2], b._points[b1], b._points[b2]);
                     if (result.AreIntersecting)
                     {

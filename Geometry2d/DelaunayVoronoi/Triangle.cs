@@ -95,12 +95,31 @@ namespace RikusGameDevToolbox.Geometry2d.DelaunayVoronoi
             var sharedVertices = Vertices.Where(o => triangle.Vertices.Contains(o)).Count();
             return sharedVertices == 2;
         }
+        
+        public Vector2 UnsharedVertexWith(Triangle triangle)
+        {
+            for (int v=0; v<3; v++)
+            {
+                if (!triangle.Vertices.Contains(Vertices[v]))
+                {
+                    return Vert(v);
+                }
+            }
+            throw new ArgumentException("Triangles do not share an edge");
+        }
+        
+      
 
         public bool IsPointInsideCircumcircle(Point point)
         {
             var d_squared = (point.X - Circumcenter.X) * (point.X - Circumcenter.X) +
                 (point.Y - Circumcenter.Y) * (point.Y - Circumcenter.Y);
             return d_squared < RadiusSquared;
+        }
+        
+        public Vector2 Centroid()
+        {
+            return (Vert(0) + Vert(1) + Vert(2)) / 3f;
         }
     }
 }
