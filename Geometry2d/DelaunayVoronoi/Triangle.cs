@@ -9,6 +9,7 @@ namespace RikusGameDevToolbox.Geometry2d.DelaunayVoronoi
     {
         public Point[] Vertices { get; } = new Point[3];
         public Point Circumcenter { get; private set; }
+        public bool IsBorder = false;
         public double RadiusSquared;
         
         // Tilapainen:

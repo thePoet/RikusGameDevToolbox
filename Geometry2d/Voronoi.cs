@@ -1,5 +1,4 @@
-using System;
-using System.Collections;
+
 using System.Collections.Generic;
 using System.Linq;
 using RikusGameDevToolbox.GeneralUse;
@@ -10,8 +9,13 @@ namespace RikusGameDevToolbox.Geometry2d
 {
     public class Voronoi
     {
+        public List<VoronoiCell> Cells => _cells;
+        public List<Edge> VoronoiEdges => _voronoiEdges;
+        public List<Triangle> DelaunayTriangles => _delaunayTriangles;
+
+        
         private List<VoronoiCell> _cells;
-        private List<Edge> _edges;
+        private List<Edge> _voronoiEdges;
         private List<Triangle> _delaunayTriangles;
         private Rect _bounds;
         
@@ -23,8 +27,8 @@ namespace RikusGameDevToolbox.Geometry2d
             _bounds.Bound(points);
     
             
-            var cellCenters = points.Select(p => new Point(p.x, p.y));
-
+            var cellCenters = points.Select(p => new Point(p.x, p.y)).ToList();
+    
             var dt = new DelaunayTriangulator();
             var triangles = new List<DelaunayVoronoi.Triangle>(dt.BowyerWatson(cellCenters));
 
@@ -34,25 +38,13 @@ namespace RikusGameDevToolbox.Geometry2d
             _delaunayTriangles = new List<Triangle>();
             foreach (var t in triangles)
             {
+                Debug.Log(t.TrianglesWithSharedEdge.ToList().Count());
                 _delaunayTriangles.Add(new Triangle(t.Vertices[0].AsVector2, t.Vertices[1].AsVector2, t.Vertices[2].AsVector2));
             }
 
           
         }
-/*
-        private VoronoiCell CreateCell(Point centerPoint)
-        {
-            var points = new List<Vector2>();
-            foreach (var triangle in centerPoint.AdjacentTriangles)
-            {
-                //triangle.
-            }
-       
-        }*/
 
-        public List<VoronoiCell> Cells() => _cells;
-        public List<Edge> Edges() => _edges;
-        public List<Triangle> DelaunayTriangles() => _delaunayTriangles;
 
         #endregion
 
@@ -70,14 +62,14 @@ namespace RikusGameDevToolbox.Geometry2d
                 foreach (DelaunayVoronoi.Triangle neighbour in triangle.TrianglesWithSharedEdge)
                 {
                     var tcn = TriangleCenter(neighbour);
-                    if (_bounds.Contains(tct) && _bounds.Contains(tcn)) voronoiEdges.Add(new Edge(tct, tcn));
+                    voronoiEdges.Add(new Edge(tct, tcn));
                 }
                 AddCellVertex(triangle.Vert(0), tct);
                 AddCellVertex(triangle.Vert(1), tct);
                 AddCellVertex(triangle.Vert(2), tct);
                 
             }
-            _edges = voronoiEdges.ToList();
+            _voronoiEdges = voronoiEdges.ToList();
 
             _cells = new List<VoronoiCell>();
             
@@ -85,10 +77,10 @@ namespace RikusGameDevToolbox.Geometry2d
             foreach (KeyValuePair<Vector2,HashSet<Vector2>> kvp in cellVertices)
             {
                 List<Vector2> vertices = kvp.Value.ToList();
-                if (vertices.Any(v => !_bounds.Contains(v))) continue;
+                bool isBorderCell =  (vertices.Any(v => !_bounds.Contains(v)));
                 Polygon2D poly = Polygon2D.FromUnorderedPoints(vertices);
                 Vector2 center = kvp.Key;
-                _cells.Add(new VoronoiCell(poly, center));
+                _cells.Add(new VoronoiCell(poly, center, isBorderCell));
             }
             Vector2 TriangleCenter(DelaunayVoronoi.Triangle t)
             {
