@@ -2,43 +2,28 @@
 using System.Collections.Generic;
 using System.Linq;
 using RikusGameDevToolbox.GeneralUse;
-using RikusGameDevToolbox.Geometry2d.DelaunayVoronoi;
 using UnityEngine;
 
 namespace RikusGameDevToolbox.Geometry2d
 {
     public class Voronoi
     {
-        public List<VoronoiCell> Cells => _cells;
-        public List<Edge> VoronoiEdges => _voronoiEdges;
-        public List<Triangle> DelaunayTriangles => _delaunayTriangles;
+        public List<VoronoiCell> Cells { get; }
+        public List<Edge> VoronoiEdges { get; }
 
-        
-        private List<VoronoiCell> _cells;
-        private List<Edge> _voronoiEdges;
-        private List<Triangle> _delaunayTriangles;
         private Rect _bounds;
+        private readonly bool _useCentroids;
         
         #region ------------------------------------------ PUBLIC METHODS -----------------------------------------------
         
-        public Voronoi(IEnumerable<Vector2> points, bool useCentroids=false)
+        public Voronoi(IEnumerable<Vector2> points, bool useCentroids = false)
         {
             _bounds = new Rect();
             _bounds.Bound(points);
-            
-            var cellCenters = points.Select(p => new Point(p.x, p.y)).ToList();
 
-            var dt = new DelaunayTriangulator();
-            var triangles = new List<DelaunayVoronoi.Triangle>(dt.BowyerWatson(cellCenters));
-            
-            GenerateFromDelaunay(triangles, useCentroids);
-
-            _delaunayTriangles = new List<Triangle>();
-            foreach (var t in triangles)
-            {
-                if (!t.IsBorder) _delaunayTriangles.Add(new Triangle(t.Vertices[0].AsVector2, t.Vertices[1].AsVector2, t.Vertices[2].AsVector2));
-            }
-            
+            _useCentroids = useCentroids;
+            var delaunay = new DelaunayTriangulation(points);
+            (Cells, VoronoiEdges) = FromDelaunay(delaunay);
         }
 
 
@@ -46,45 +31,39 @@ namespace RikusGameDevToolbox.Geometry2d
 
         #region ------------------------------------------ PRIVATE METHODS ----------------------------------------------
         
-        private void GenerateFromDelaunay(IEnumerable<DelaunayVoronoi.Triangle> triangulation, bool useCentroids)
+        private (List<VoronoiCell>, List<Edge>) FromDelaunay(DelaunayTriangulation dt)
         {
+            var triangles = dt.Triangles;
             var voronoiEdges = new HashSet<Edge>();
             
             var cellVertices = new Dictionary<Vector2, HashSet<Vector2>>();
             
-            foreach (var triangle in triangulation)
+            foreach (var triangle in triangles)
             {
-               // if (triangle.IsBorder) continue;
-                
                 var tct = TriangleCenter(triangle);
-                foreach (DelaunayVoronoi.Triangle neighbour in triangle.TrianglesWithSharedEdge)
+                foreach (Triangle neighbour in dt.TrianglesWithSharedEdge(triangle))
                 {
                     var tcn = TriangleCenter(neighbour);
                     voronoiEdges.Add(new Edge(tct, tcn));
                 }
-                AddCellVertex(triangle.Vert(0), tct);
-                AddCellVertex(triangle.Vert(1), tct);
-                AddCellVertex(triangle.Vert(2), tct);
-                
+                AddCellVertex(triangle.Vertex1, tct);
+                AddCellVertex(triangle.Vertex2, tct);
+                AddCellVertex(triangle.Vertex3, tct);
             }
-            _voronoiEdges = voronoiEdges.ToList();
+       
 
-            _cells = new List<VoronoiCell>();
-            
-          
+            var cells = new List<VoronoiCell>();
             foreach (KeyValuePair<Vector2,HashSet<Vector2>> kvp in cellVertices)
             {
                 List<Vector2> vertices = kvp.Value.ToList();
-                bool isBorderCell =  (vertices.Any(v => !_bounds.Contains(v)));
+                bool isBorderCell = false;//(vertices.Any(v => !_bounds.Contains(v)));
                 Polygon2D poly = Polygon2D.FromUnorderedPoints(vertices);
+                if (!IsInsideBounds(poly)) continue;
                 Vector2 center = kvp.Key;
-                _cells.Add(new VoronoiCell(poly, center, isBorderCell));
+                cells.Add(new VoronoiCell(poly, center, isBorderCell));
             }
-            Vector2 TriangleCenter(DelaunayVoronoi.Triangle t)
-            {
-                if (useCentroids) return t.Centroid();
-                return (t.Circumcenter.AsVector2);
-            }
+
+            return (cells, voronoiEdges.ToList());
             
             void AddCellVertex(Vector2 center, Vector2 vertex)
             {
@@ -96,7 +75,15 @@ namespace RikusGameDevToolbox.Geometry2d
             }
         }
         
+        Vector2 TriangleCenter(Triangle t)
+        {
+            if (_useCentroids) return t.Centroid;
+            return (t.Circumcenter);
+        }
         
+        bool IsInsideBounds(Polygon2D poly) => poly.Points.All(v => _bounds.Contains(v));
+        
+      
         
         #endregion
 
