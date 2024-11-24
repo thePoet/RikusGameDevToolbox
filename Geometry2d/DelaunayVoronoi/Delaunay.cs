@@ -1,5 +1,6 @@
 ﻿using System.Collections.Generic;
 using System.Linq;
+using RikusGameDevToolbox.GeneralUse;
 using UnityEngine;
 using Random = System.Random;
 
@@ -10,35 +11,6 @@ namespace RikusGameDevToolbox.Geometry2d.DelaunayVoronoi
 {
     public class DelaunayTriangulator
     {
-        private double MaxX { get; set; }
-        private double MaxY { get; set; }
-        private IEnumerable<Triangle> border;
-
-        public IEnumerable<Point> GeneratePoints(int amount, double maxX, double maxY)
-        {
-            MaxX = maxX;
-            MaxY = maxY;
-
-            // TODO make more beautiful
-            var point0 = new Point(0, 0);
-            var point1 = new Point(0, MaxY);
-            var point2 = new Point(MaxX, MaxY);
-            var point3 = new Point(MaxX, 0);
-            var points = new List<Point>() { point0, point1, point2, point3 };
-            var tri1 = new Triangle(point0, point1, point2);
-            var tri2 = new Triangle(point0, point2, point3);
-            border = new List<Triangle>() { tri1, tri2 };
-
-            var random = new Random();
-            for (int i = 0; i < amount - 4; i++)
-            {
-                var pointX = random.NextDouble() * MaxX;
-                var pointY = random.NextDouble() * MaxY;
-                points.Add(new Point(pointX, pointY));
-            }
-
-            return points;
-        }
 
         public IEnumerable<Triangle> BowyerWatson(IEnumerable<Vector2> points)
         {
@@ -48,8 +20,12 @@ namespace RikusGameDevToolbox.Geometry2d.DelaunayVoronoi
 
         public IEnumerable<Triangle> BowyerWatson(IEnumerable<Point> points)
         {
-            var supraTriangle = GenerateSupraTriangle();
-            //var triangulation = new HashSet<Triangle>(border);
+            var supraTriangle = GenerateSupraTriangle(points);
+       
+           
+
+           
+           // var triangulation = new HashSet<Triangle>(border);
             var triangulation = new HashSet<Triangle> { supraTriangle };
 
             foreach (var point in points)
@@ -91,17 +67,18 @@ namespace RikusGameDevToolbox.Geometry2d.DelaunayVoronoi
             return boundaryEdges.ToList();
         }
 
-        private Triangle GenerateSupraTriangle()
+        private Triangle GenerateSupraTriangle(IEnumerable<Point> points)
         {
-            //   1  -> maxX
-            //  / \
-            // 2---3
-            // |
-            // v maxY
-            var margin = 500;
-            var point1 = new Point(0.5 * MaxX, -2 * MaxX - margin);
-            var point2 = new Point(-2 * MaxY - margin, 2 * MaxY + margin);
-            var point3 = new Point(2 * MaxX + MaxY + margin, 2 * MaxY + margin);
+            
+            Rect bounds = new Rect();
+            bounds.Bound(points.Select(p => p.AsVector2));
+            bounds = bounds.Grow(bounds.size.magnitude*2f);
+       
+            var point1 = new Point(bounds.min.x, bounds.min.y);
+            var point2 = new Point(bounds.max.x, bounds.min.y);
+            var point3 = new Point((bounds.min.x+bounds.max.x)/2f, bounds.max.y);
+            
+            
             return new Triangle(point1, point2, point3);
         }
 

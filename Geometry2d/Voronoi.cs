@@ -2,6 +2,7 @@ using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
+using RikusGameDevToolbox.GeneralUse;
 using RikusGameDevToolbox.Geometry2d.DelaunayVoronoi;
 using UnityEngine;
 
@@ -12,11 +13,15 @@ namespace RikusGameDevToolbox.Geometry2d
         private List<VoronoiCell> _cells;
         private List<Edge> _edges;
         private List<Triangle> _delaunayTriangles;
+        private Rect _bounds;
         
         #region ------------------------------------------ PUBLIC METHODS -----------------------------------------------
         
-        public Voronoi(IEnumerable<Vector2> points, Rect bounds, bool useCentroids=false)
+        public Voronoi(IEnumerable<Vector2> points, bool useCentroids=false)
         {
+            _bounds = new Rect();
+            _bounds.Bound(points);
+    
             
             var cellCenters = points.Select(p => new Point(p.x, p.y));
 
@@ -65,7 +70,7 @@ namespace RikusGameDevToolbox.Geometry2d
                 foreach (DelaunayVoronoi.Triangle neighbour in triangle.TrianglesWithSharedEdge)
                 {
                     var tcn = TriangleCenter(neighbour);
-                    voronoiEdges.Add(new Edge(tct, tcn));
+                    if (_bounds.Contains(tct) && _bounds.Contains(tcn)) voronoiEdges.Add(new Edge(tct, tcn));
                 }
                 AddCellVertex(triangle.Vert(0), tct);
                 AddCellVertex(triangle.Vert(1), tct);
@@ -75,9 +80,12 @@ namespace RikusGameDevToolbox.Geometry2d
             _edges = voronoiEdges.ToList();
 
             _cells = new List<VoronoiCell>();
+            
+          
             foreach (KeyValuePair<Vector2,HashSet<Vector2>> kvp in cellVertices)
             {
                 List<Vector2> vertices = kvp.Value.ToList();
+                if (vertices.Any(v => !_bounds.Contains(v))) continue;
                 Polygon2D poly = Polygon2D.FromUnorderedPoints(vertices);
                 Vector2 center = kvp.Key;
                 _cells.Add(new VoronoiCell(poly, center));

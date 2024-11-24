@@ -92,7 +92,7 @@ namespace RikusGameDevToolbox.Geometry2d.DelaunayVoronoi
 
         public bool SharesEdgeWith(Triangle triangle)
         {
-            var sharedVertices = Vertices.Where(o => triangle.Vertices.Contains(o)).Count();
+            var sharedVertices = Vertices.Count(o => triangle.Vertices.Contains(o));
             return sharedVertices == 2;
         }
         

@@ -34,5 +34,10 @@ namespace RikusGameDevToolbox.Geometry2d
         {
             return HashCode.Combine(V1, V2, V3);
         }
+        
+        public override string ToString()
+        {
+            return "Triangle: " + V1 + ", " + V2 + ", " + V3;
+        }
     }
 }
