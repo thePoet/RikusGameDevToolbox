@@ -31,6 +31,26 @@ namespace RikusGameDevToolbox.Geometry2d
         #region ------------------------------------------ PUBLIC METHODS -----------------------------------------------
         
         /// <summary>
+        /// Creates a regular polygon with the given number of sides and radius.
+        /// </summary>
+        public static Polygon CreateRegular(int numSides, float radius)
+        {
+            if (numSides < 3)
+            {
+                throw new ArgumentException("A polygon must have at least 3 sides.");
+            }
+            
+            var points = new Vector2[numSides];
+            for (int i = 0; i < numSides; i++)
+            {
+                points[i] = new Vector2(radius * Mathf.Cos(2 * Mathf.PI * -i / numSides), 
+                    radius * Mathf.Sin(2 * Mathf.PI * -i / numSides)) * radius;
+            }
+
+            return new Polygon(points);
+        }
+        
+        /// <summary>
         /// Attemps to creates a polygon from the given unordered points. Works if the polygon is convex or nearly so.
         /// </summary>
         public static Polygon FromUnorderedPoints(IEnumerable<Vector2> points)
