@@ -57,7 +57,7 @@ namespace RikusGameDevToolbox.Geometry2d
             {
                 List<Vector2> vertices = kvp.Value.ToList();
                 bool isBorderCell = false;//(vertices.Any(v => !_bounds.Contains(v)));
-                Polygon2D poly = Polygon2D.FromUnorderedPoints(vertices);
+                Polygon poly = Polygon.FromUnorderedPoints(vertices);
                 if (!IsInsideBounds(poly)) continue;
                 Vector2 center = kvp.Key;
                 cells.Add(new VoronoiCell(poly, center, isBorderCell));
@@ -81,7 +81,7 @@ namespace RikusGameDevToolbox.Geometry2d
             return (t.Circumcenter);
         }
         
-        bool IsInsideBounds(Polygon2D poly) => poly.Points.All(v => _bounds.Contains(v));
+        bool IsInsideBounds(Polygon poly) => poly.Points.All(v => _bounds.Contains(v));
         
       
         

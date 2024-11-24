@@ -9,7 +9,7 @@ namespace RikusGameDevToolbox.Geometry2d
     /// A polygon in 2D space
     /// Holes, self-intersections and duplicate points are not allowed.
     [Serializable]
-    public struct Polygon2D : IEquatable<Polygon2D>
+    public struct Polygon : IEquatable<Polygon>
     {
         
         // An intersection of the outlines of two Polygon2D:s.
@@ -33,13 +33,13 @@ namespace RikusGameDevToolbox.Geometry2d
         /// <summary>
         /// Attemps to creates a polygon from the given unordered points. Works if the polygon is convex or nearly so.
         /// </summary>
-        public static Polygon2D FromUnorderedPoints(IEnumerable<Vector2> points)
+        public static Polygon FromUnorderedPoints(IEnumerable<Vector2> points)
         {
             var list = points.ToList();
             Vector2 center = new Vector2(list.Average(p => p.x), list.Average(p => p.y));
             
             list.Sort(SortByAngle);
-            return new Polygon2D( list );
+            return new Polygon( list );
             
             int SortByAngle(Vector2 p1, Vector2 p2)
             {
@@ -54,7 +54,7 @@ namespace RikusGameDevToolbox.Geometry2d
         /// Constructor for a polygon with the given points.
         /// </summary>
         /// <param name="points">Points of the of polygon in clockwise order.</param>
-        public Polygon2D(IEnumerable<Vector2> points)
+        public Polygon(IEnumerable<Vector2> points)
         {
             _points = new List<Vector2>(points);
         }
@@ -92,7 +92,7 @@ namespace RikusGameDevToolbox.Geometry2d
             }
         }
 
-        public bool IsOutlineIntersecting(Polygon2D other)
+        public bool IsOutlineIntersecting(Polygon other)
         {
             foreach (var e1 in Edges())
             {
@@ -108,28 +108,28 @@ namespace RikusGameDevToolbox.Geometry2d
 
    
 
-        public Polygon2D Transform(Transform transform)
+        public Polygon Transform(Transform transform)
         {
             return ForEachPoint(p => transform.TransformPoint(p));
           
         }
 
-        public Polygon2D InverseTransform(Transform transform)
+        public Polygon InverseTransform(Transform transform)
         {
             return ForEachPoint(p => transform.InverseTransformPoint(p));
         }
 
-        public Polygon2D MakeCopy()
+        public Polygon MakeCopy()
         {
-            return new Polygon2D(_points);
+            return new Polygon(_points);
         }
 
-        public Polygon2D ForEachPoint(Func<Vector2, Vector2> func)
+        public Polygon ForEachPoint(Func<Vector2, Vector2> func)
         {
-            return new Polygon2D(_points.Select(func));
+            return new Polygon(_points.Select(func));
         }
 
-        public int NumSharedVerticesWith(Polygon2D other)
+        public int NumSharedVerticesWith(Polygon other)
         {
             int result = 0;
             foreach (var myPoint in _points)
@@ -147,7 +147,7 @@ namespace RikusGameDevToolbox.Geometry2d
         /// Removes some of the common area polygon has with polygon B.
         /// When applied to both polygons, the cease to overlap. 
         /// </summary>
-        public Polygon2D PartiallySubtract(Polygon2D polygon)
+        public Polygon PartiallySubtract(Polygon polygon)
         {
             var intersections = OutlineIntersections(this, polygon);
             if (intersections.Count == 0) return MakeCopy();
@@ -163,7 +163,7 @@ namespace RikusGameDevToolbox.Geometry2d
             return CutBetweenIntersections(intersections[0], intersections[1], this);
 
 
-            Polygon2D CutBetweenIntersections(OutlineIntersection i1, OutlineIntersection i2, Polygon2D polygonToBeCut)
+            Polygon CutBetweenIntersections(OutlineIntersection i1, OutlineIntersection i2, Polygon polygonToBeCut)
             {
                 var result = polygonToBeCut.MakeCopy();
 
@@ -205,16 +205,16 @@ namespace RikusGameDevToolbox.Geometry2d
      
         }
         
-        public bool Equals(Polygon2D other)
+        public bool Equals(Polygon other)
         {
             bool sameNumberOfPoints = _points.Count == other._points.Count;
             bool samePoints = _points.All(point => other._points.Contains(point));
             return sameNumberOfPoints && samePoints;
         }
 
-        public override bool Equals(object obj) => obj is Polygon2D other && Equals(other);
-        public static bool operator == (Polygon2D p1, Polygon2D p2) => p1.Equals(p2);
-        public static bool operator != (Polygon2D p1, Polygon2D p2) => !p1.Equals(p2);
+        public override bool Equals(object obj) => obj is Polygon other && Equals(other);
+        public static bool operator == (Polygon p1, Polygon p2) => p1.Equals(p2);
+        public static bool operator != (Polygon p1, Polygon p2) => !p1.Equals(p2);
         
         public override int GetHashCode()
         {
@@ -225,7 +225,7 @@ namespace RikusGameDevToolbox.Geometry2d
 
         #region ------------------------------------------ PRIVATE METHODS ----------------------------------------------
         
-        private static List<OutlineIntersection> OutlineIntersections(Polygon2D a, Polygon2D b)
+        private static List<OutlineIntersection> OutlineIntersections(Polygon a, Polygon b)
         {
             List<OutlineIntersection> intersections = new List<OutlineIntersection>();
             

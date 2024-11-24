@@ -5,11 +5,11 @@ namespace RikusGameDevToolbox.Geometry2d
 {
     public struct VoronoiCell : IEquatable<VoronoiCell>
     {
-        public Polygon2D Polygon { get; }
+        public Polygon Polygon { get; }
         public Vector2 Center { get; }
         public bool IsBorderCell { get; }
         
-        public VoronoiCell(Polygon2D polygon, Vector2 center, bool isBorderCell)
+        public VoronoiCell(Polygon polygon, Vector2 center, bool isBorderCell)
         {
             Polygon = polygon;
             Center = center;
