@@ -6,6 +6,7 @@ using Random = System.Random;
 
 // Based on https://github.com/RafaelKuebler/DelaunayVoronoi
 
+// No vertex lies inside the circumcircle of any triangle in the triangulation
 
 namespace RikusGameDevToolbox.Geometry2d.DelaunayVoronoi
 {
@@ -20,31 +21,11 @@ namespace RikusGameDevToolbox.Geometry2d.DelaunayVoronoi
 
         public IEnumerable<Triangle> BowyerWatson(List<Point> points)
         {
-            //Rect bounds = new Rect(new Vector2(0f, 0f), new Vector2(100f, 100f));
-            float margin = 10f;
-            Rect bounds = Bounds(points);
-            bounds = bounds.Grow(margin);
-
-            Point[] corners = new Point[]
-            {
-                new Point(bounds.min.x, bounds.min.y),
-                new Point(bounds.max.x, bounds.min.y),
-                new Point(bounds.max.x, bounds.max.y),
-                new Point(bounds.min.x, bounds.max.y)
-            };
-
-            var t1 = new Triangle(corners[0], corners[1], corners[2]);
-            var t2 = new Triangle(corners[0], corners[2], corners[3]);
-
-         
+        
             
-            
-           // var supraTriangle = GenerateSupraTriangle(points);
+            var superTriangle = GenerateSuperTriangle(points);
 
-            var triangulation = new HashSet<Triangle>() {t1,t2};
-            points.InsertRange(0, corners);
-            
-          //  var triangulation = new HashSet<Triangle> { supraTriangle };
+            var triangulation = new HashSet<Triangle> { superTriangle };
 
             foreach (var point in points)
             {
@@ -66,12 +47,10 @@ namespace RikusGameDevToolbox.Geometry2d.DelaunayVoronoi
                     triangulation.Add(triangle);
                 }
             }
+
+     
             
-           // var trianglesTouchingSupra = triangulation.Where(o => o.Vertices.Any(v => supraTriangle.Vertices.Contains(v)));
-            //triangulation.RemoveWhere(o => trianglesTouchingSupra.Contains(o));
-            
-            
-            //triangulation.RemoveWhere(o => o.Vertices.Any(v => supraTriangle.Vertices.Contains(v)));
+            triangulation.RemoveWhere(o => o.Vertices.Any(v => superTriangle.Vertices.Contains(v)));
             
           
             
@@ -92,7 +71,7 @@ namespace RikusGameDevToolbox.Geometry2d.DelaunayVoronoi
             return boundaryEdges.ToList();
         }
 
-        private Triangle GenerateSupraTriangle(IEnumerable<Point> points)
+        private Triangle GenerateSuperTriangle(IEnumerable<Point> points)
         {
             Rect bounds = Bounds(points);
             bounds = bounds.Grow(bounds.size.magnitude*2f);

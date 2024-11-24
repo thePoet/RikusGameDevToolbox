@@ -25,24 +25,20 @@ namespace RikusGameDevToolbox.Geometry2d
         {
             _bounds = new Rect();
             _bounds.Bound(points);
-    
             
             var cellCenters = points.Select(p => new Point(p.x, p.y)).ToList();
-    
+
             var dt = new DelaunayTriangulator();
             var triangles = new List<DelaunayVoronoi.Triangle>(dt.BowyerWatson(cellCenters));
-
             
             GenerateFromDelaunay(triangles, useCentroids);
 
             _delaunayTriangles = new List<Triangle>();
             foreach (var t in triangles)
             {
-                Debug.Log(t.TrianglesWithSharedEdge.ToList().Count());
-                _delaunayTriangles.Add(new Triangle(t.Vertices[0].AsVector2, t.Vertices[1].AsVector2, t.Vertices[2].AsVector2));
+                if (!t.IsBorder) _delaunayTriangles.Add(new Triangle(t.Vertices[0].AsVector2, t.Vertices[1].AsVector2, t.Vertices[2].AsVector2));
             }
-
-          
+            
         }
 
 
@@ -58,6 +54,8 @@ namespace RikusGameDevToolbox.Geometry2d
             
             foreach (var triangle in triangulation)
             {
+               // if (triangle.IsBorder) continue;
+                
                 var tct = TriangleCenter(triangle);
                 foreach (DelaunayVoronoi.Triangle neighbour in triangle.TrianglesWithSharedEdge)
                 {

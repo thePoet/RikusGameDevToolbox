@@ -5,24 +5,28 @@ namespace RikusGameDevToolbox.Geometry2d
 {
     public struct Triangle : IEquatable<Triangle>
     {
-        public Vector2 V1 { get; }
-        public Vector2 V2 { get; }
-        public Vector2 V3 { get; }
+        public Vector2 Vertex1 { get; }
+        public Vector2 Vertex2 { get; }
+        public Vector2 Vertex3 { get; }
 
-        public Vector2[] Vertices => new[] { V1, V2, V3 };
+        public Vector2[] Vertices => new[] { Vertex1, Vertex2, Vertex3 };
+        public Edge[] Edges => new[] { new Edge(Vertex1, Vertex2), new Edge(Vertex2, Vertex3), new Edge(Vertex3, Vertex1) };
 
         public Triangle(Vector2 v1, Vector2 v2, Vector2 v3)
         {
-            V1 = v1;
-            V2 = v2;
-            V3 = v3;
+            if (v1 == v2 || v1 == v3 || v2 == v3)
+            {
+                throw new ArgumentException("Triangle vertices must be unique.");
+            }
+
+            (Vertex1, Vertex2, Vertex3) = (v1, v2, v3);
         }
    
         public bool Equals(Triangle other)
         {
-            return ( V1 == other.V1 || V1 == other.V2 || V1 == other.V3 ) &&
-                   ( V2 == other.V1 || V2 == other.V2 || V2 == other.V3 ) &&
-                   ( V3 == other.V1 || V3 == other.V2 || V3 == other.V3 );
+            return ( Vertex1 == other.Vertex1 || Vertex1 == other.Vertex2 || Vertex1 == other.Vertex3 ) &&
+                   ( Vertex2 == other.Vertex1 || Vertex2 == other.Vertex2 || Vertex2 == other.Vertex3 ) &&
+                   ( Vertex3 == other.Vertex1 || Vertex3 == other.Vertex2 || Vertex3 == other.Vertex3 );
         }
 
 
@@ -32,12 +36,12 @@ namespace RikusGameDevToolbox.Geometry2d
 
         public override int GetHashCode()
         {
-            return HashCode.Combine(V1, V2, V3);
+            return HashCode.Combine(Vertex1, Vertex2, Vertex3);
         }
         
         public override string ToString()
         {
-            return "Triangle: " + V1 + ", " + V2 + ", " + V3;
+            return "Triangle: " + Vertex1 + ", " + Vertex2 + ", " + Vertex3;
         }
     }
 }
