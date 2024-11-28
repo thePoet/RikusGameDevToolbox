@@ -65,7 +65,7 @@ namespace RikusGameDevToolbox.Geometry2d
             {
                 float angle1 = Math2d.GetAngle(Vector2.up, p1-center);
                 float angle2 = Math2d.GetAngle(Vector2.up, p2-center);
-                return angle1.CompareTo(angle2);
+                return -angle1.CompareTo(angle2);
             }
    
         }
@@ -124,6 +124,10 @@ namespace RikusGameDevToolbox.Geometry2d
 
             return false;
         }
+        
+        
+        public bool IsSharingVerticesWith(Polygon other) => _points.Any(point => other._points.Contains(point));
+        
 
 
    
