@@ -3,6 +3,8 @@ using System.Collections.Generic;
 using System.Linq;
 using RikusGameDevToolbox.GeneralUse;
 using UnityEngine;
+using UnityEngine.Assertions;
+using Clipper2Lib;
 
 namespace RikusGameDevToolbox.Geometry2d
 {
@@ -26,7 +28,7 @@ namespace RikusGameDevToolbox.Geometry2d
         
         [SerializeField]
         private List<Vector2> _points;
-    
+        private PathD _pathD;
 
         #region ------------------------------------------ PUBLIC METHODS -----------------------------------------------
         
@@ -53,12 +55,13 @@ namespace RikusGameDevToolbox.Geometry2d
         /// <summary>
         /// Attemps to creates a polygon from the given unordered points. Works if the polygon is convex or nearly so.
         /// </summary>
-        public static Polygon FromUnorderedPoints(IEnumerable<Vector2> points)
+        public static Polygon? FromUnorderedPoints(IEnumerable<Vector2> points)
         {
             var list = points.ToList();
             Vector2 center = new Vector2(list.Average(p => p.x), list.Average(p => p.y));
             
             list.Sort(SortByAngle);
+            if (!IsInClockwiseOrder(ToPathD(list))) return null;
             return new Polygon( list );
             
             int SortByAngle(Vector2 p1, Vector2 p2)
@@ -71,13 +74,18 @@ namespace RikusGameDevToolbox.Geometry2d
         }
         
         /// <summary>
-        /// Constructor for a polygon with the given points.
+        /// Constructor for a polygon with the given points. 
         /// </summary>
-        /// <param name="points">Points of the of polygon in clockwise order.</param>
+        /// <param name="points">Points of the of polygon  clockwise order.</param>
         public Polygon(IEnumerable<Vector2> points)
         {
             _points = new List<Vector2>(points);
+            _pathD = null;
+            _pathD = ToPathD(_points);
+            Assert.IsTrue(IsInClockwiseOrder(_pathD), "Polygon's points must be given in clockwise order.");
         }
+
+     
 
         /// <summary>
         /// Is a point inside the polygon?
@@ -130,12 +138,15 @@ namespace RikusGameDevToolbox.Geometry2d
         
 
 
-   
+
+        public Polygon Offset(Vector2 offset)
+        {
+            return ForEachPoint(p => p + offset);
+        }
 
         public Polygon Transform(Transform transform)
         {
             return ForEachPoint(p => transform.TransformPoint(p));
-          
         }
 
         public Polygon InverseTransform(Transform transform)
@@ -302,7 +313,18 @@ namespace RikusGameDevToolbox.Geometry2d
             }
         }
 
-
+        private static bool IsInClockwiseOrder(PathD pathD)
+        {
+            return !Clipper.IsPositive(pathD);
+            /*
+            float sum = 0f;
+            for (int i=0; i< points.Count; i++)
+            {
+                int j = (i + 1) % points.Count;
+                sum += (points[j].x - points[i].x) * (points[j].y + points[i].y);
+            }
+           return sum < 0f;*/
+        }
                 
         Vector2 AverageOfPoints()
         {
@@ -313,7 +335,11 @@ namespace RikusGameDevToolbox.Geometry2d
             }
             return sum / _points.Count;
         }
-        
+
+        private static PathD ToPathD(IEnumerable<Vector2> points)
+        {
+            return new PathD(points.Select(point => new PointD(point.x, point.y)));
+        }
 
         #endregion
 

@@ -57,10 +57,11 @@ namespace RikusGameDevToolbox.Geometry2d
             {
                 List<Vector2> vertices = kvp.Value.ToList();
                 bool isBorderCell = false;//(vertices.Any(v => !_bounds.Contains(v)));
-                Polygon poly = Polygon.FromUnorderedPoints(vertices);
-                if (!IsInsideBounds(poly)) continue;
+                Polygon? poly = Polygon.FromUnorderedPoints(vertices);
+                if (!poly.HasValue) continue;
+                if (!IsInsideBounds(poly.Value)) continue;
                 Vector2 center = kvp.Key;
-                cells.Add(new VoronoiCell(poly, center, isBorderCell));
+                cells.Add(new VoronoiCell(poly.Value, center, isBorderCell));
             }
 
             return (cells, voronoiEdges.ToList());
