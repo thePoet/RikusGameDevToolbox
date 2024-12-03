@@ -25,8 +25,12 @@ namespace RikusGameDevToolbox.Geometry2d
             public override string ToString() => $"Intersection of {PointIdx1} and {PointIdx2} at {IntersectionPosition} is start: {IsStartOfIntersectingArea}"; 
         }
 
-        public Vector2[] Points => _points.ToArray();
-        
+        public List<Vector2> Points
+        {
+            get => _points;
+            set => SetPoints(value);
+        }
+
         [SerializeField]
         private List<Vector2> _points;
         private PathD _pathD;
@@ -38,11 +42,6 @@ namespace RikusGameDevToolbox.Geometry2d
         /// </summary>
         public static Polygon CreateRegular(int numSides, float radius)
         {
-            if (numSides < 3)
-            {
-                throw new ArgumentException("A polygon must have at least 3 sides.");
-            }
-            
             var points = new Vector2[numSides];
             for (int i = 0; i < numSides; i++)
             {
@@ -57,7 +56,7 @@ namespace RikusGameDevToolbox.Geometry2d
         /// Attemps to creates a polygon from the given unordered points. Works if the polygon is convex or nearly so.
         /// Return null if it fails.
         /// </summary>
-        public static Polygon? FromUnorderedPoints(IEnumerable<Vector2> points)
+        public static Polygon FromUnorderedPoints(IEnumerable<Vector2> points)
         {
             var list = points.ToList();
             Vector2 center = new Vector2(list.Average(p => p.x), list.Average(p => p.y));
@@ -95,7 +94,7 @@ namespace RikusGameDevToolbox.Geometry2d
         /// <summary>
         /// Returns the union (OR) of two polygons. Returns null if the polygons do not intersect. 
         /// </summary>
-        public static Polygon? Union(Polygon poly1, Polygon poly2)
+        public static Polygon Union(Polygon poly1, Polygon poly2)
         {
             PathsD union = Clipper.Union(poly1.ToPathsD(), poly2.ToPathsD(), FillRule.EvenOdd, 8);
             if (union.Count != 1) return null;
@@ -124,12 +123,8 @@ namespace RikusGameDevToolbox.Geometry2d
         /// <param name="points">Points of the of polygon  clockwise order.</param>
         public Polygon(IEnumerable<Vector2> points)
         {
-            _points = new List<Vector2>(points);
-            _pathD = null;
-            _pathD = ToPathD(_points);
-            Assert.IsTrue(IsInClockwiseOrder(_pathD), "Polygon's points must be given in clockwise order.");
+            SetPoints(points);
         }
-        
 
         /// <summary>
         /// Is the point inside the polygon or on the edge of it?
@@ -313,22 +308,53 @@ namespace RikusGameDevToolbox.Geometry2d
             return sum / _points.Count;
         }
         
+        public Vector2 Centroid()
+        {
+            // https://stackoverflow.com/a/34732659
+
+            var centroid = Vector2.zero;
+            float area = 0;
+
+            for (int i = 0; i < _points!.Count; i++)
+            {
+                int i2 = i == _points.Count - 1 ? 0 : i + 1;
+
+                float xi = _points[i].x;
+                float yi = _points[i].y;
+                float xi2 = _points[i2].x;
+                float yi2 = _points[i2].y;
+
+                float mult = (xi * yi2 - xi2 * yi) / 3f;
+        
+                Vector2 add = mult * new Vector2( xi + xi2, yi + yi2 );
+             
+                float addArea = xi * yi2 - xi2 * yi;
+
+                if (i == 0)
+                {
+                    centroid = add;
+                    area = addArea;
+                }
+                else
+                {
+                    centroid += add;
+                    area += addArea;
+                }
+            }
+          
+            centroid /= area;
+
+            return centroid;
+        }
+        
+        
         // TODO: Make more efficient
         public bool Equals(Polygon other)
         {
+            if (other == null) return false;
             bool sameNumberOfPoints = _points.Count == other._points.Count;
             bool samePoints = _points.All(point => other._points.Contains(point));
             return sameNumberOfPoints && samePoints;
-        }
-
-        public override bool Equals(object obj) => obj is Polygon other && Equals(other);
-        /*
-        public static bool operator == (Polygon p1, Polygon p2) => p1.Equals(p2);
-        public static bool operator != (Polygon p1, Polygon p2) => !p1.Equals(p2);
-        */
-        public override int GetHashCode()
-        {
-            return (_points != null ? _points.GetHashCode() : 0);
         }
         
         public override string ToString()
@@ -344,6 +370,17 @@ namespace RikusGameDevToolbox.Geometry2d
         #endregion
 
         #region ------------------------------------------ PRIVATE METHODS ----------------------------------------------
+        
+        private void SetPoints(IEnumerable<Vector2> points)
+        {
+            _points = new List<Vector2>(points);
+            if (_points.Count() < 3)
+            {
+                throw new ArgumentException("A polygon must have at least 3 sides.");
+            }
+            _pathD = ToPathD(_points);
+            Assert.IsTrue(IsInClockwiseOrder(_pathD), "Polygon's points must be given in clockwise order.");
+        }
         
         private Polygon(PathD path)
         {
@@ -417,10 +454,6 @@ namespace RikusGameDevToolbox.Geometry2d
             }
         }
 
-                
- 
-
- 
 
         #endregion
 
