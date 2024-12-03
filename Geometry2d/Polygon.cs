@@ -76,6 +76,7 @@ namespace RikusGameDevToolbox.Geometry2d
 
         /// <summary>
         /// Returns the intersections (AND) of two polygons i.e. the areas that are common to both polygons.
+        /// Intersections are sorted by area in descending order.
         /// </summary>
         public static List<Polygon> Intersection(Polygon poly1, Polygon poly2)
         {
@@ -86,6 +87,7 @@ namespace RikusGameDevToolbox.Geometry2d
                 pathd.Reverse();
                 intersections.Add(new Polygon(pathd));
             }
+            SortByAreaDescending(intersections);
             return intersections;
         }
         
@@ -104,6 +106,7 @@ namespace RikusGameDevToolbox.Geometry2d
         
         /// <summary>
         /// Returns the polygon that is poly1 NOT poly2 i.e. subtracts poly2 from poly1.
+        /// The resulting polygons are sorted by area in descending order.
         /// </summary>
         public static List<Polygon> Subtract(Polygon poly1, Polygon poly2)
         {
@@ -114,6 +117,27 @@ namespace RikusGameDevToolbox.Geometry2d
                 pathd.Reverse();
                 result.Add(new Polygon(pathd));
             }
+            SortByAreaDescending(result);
+            return result;
+        }
+
+        /// <summary>
+        /// Inflates/deflates the polygon by the given amount. 
+        /// Creates new polygon(s) so that their outline is parallel to original
+        /// The resulting list of polygons are sorted by area in descending order.
+        /// </summary>
+        /// <param name="polygon"></param>
+        /// <param name="amount">Distance between old and new outline.</param>
+        /// <returns>List of resulting polygons descending from the largest by area.</returns>
+        public static List<Polygon> Inflate(Polygon polygon, float amount)
+        {
+            var paths = Clipper.InflatePaths(polygon.ToPathsD(), amount, JoinType.Miter, EndType.Polygon);
+            List<Polygon> result = new List<Polygon>();
+            foreach(var pathd in paths)
+            {
+                result.Add(new Polygon(pathd));
+            }
+            SortByAreaDescending(result);
             return result;
         }
 
@@ -147,6 +171,8 @@ namespace RikusGameDevToolbox.Geometry2d
             var polygon = this;
             return _points.Any(p => other.IsPointInside(p)) || other._points.Any(p => polygon.IsPointInside(p));
         }
+
+
 
         /// <summary>
         /// Return true if all the points of this polygon are inside or on the edge of the other polygon. 
@@ -366,11 +392,25 @@ namespace RikusGameDevToolbox.Geometry2d
             }
             return result;
         }
+
+        public void DrawWithGizmos()
+        {
+            Gizmos.color = Color.green;
+            foreach (var edge in Edges())
+            {
+                Gizmos.DrawLine(edge.Point1, edge.Point2);
+            }
+        }
         
         #endregion
 
         #region ------------------------------------------ PRIVATE METHODS ----------------------------------------------
         
+        private static void SortByAreaDescending(List<Polygon> list)
+        {
+            list.Sort((a, b) => b.Area().CompareTo(a.Area()));
+        }
+
         private void SetPoints(IEnumerable<Vector2> points)
         {
             _points = new List<Vector2>(points);
@@ -453,6 +493,7 @@ namespace RikusGameDevToolbox.Geometry2d
                 yield return i == _points.Count - 1 ? (i, 0) : (i, i + 1);
             }
         }
+        
 
 
         #endregion
