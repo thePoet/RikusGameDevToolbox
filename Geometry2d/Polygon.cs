@@ -152,6 +152,14 @@ namespace RikusGameDevToolbox.Geometry2d
             var polygon = this;
             return _points.Any(p => other.IsPointInside(p)) || other._points.Any(p => polygon.IsPointInside(p));
         }
+
+        /// <summary>
+        /// Return true if all the points of this polygon are inside or on the edge of the other polygon. 
+        /// </summary>
+        public bool IsInsideOf(Polygon other)
+        {
+            return _points.All(p=> other.IsPointInside(p) || other.IsPointOnEdge(p));
+        }
   
         public IEnumerable<Edge> Edges()
         {
