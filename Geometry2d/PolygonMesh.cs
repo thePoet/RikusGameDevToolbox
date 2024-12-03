@@ -10,7 +10,10 @@ namespace RikusGameDevToolbox.Geometry2d
         {
             return null;
         }
-        
+
         public bool IsOnBorder(int polygonIdx)
+        {
+            return false;
+        }
     }
 }

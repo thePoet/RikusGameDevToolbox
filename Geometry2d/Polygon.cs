@@ -12,7 +12,7 @@ namespace RikusGameDevToolbox.Geometry2d
     /// No holes, self-intersections or duplicate points allowed.
     /// Uses Angus Johnson's awesome Clipper2 library..
     [Serializable]
-    public struct Polygon : IEquatable<Polygon>
+    public class Polygon : IEquatable<Polygon>
     {
         
         // An intersection of the outlines of two Polygon2D:s.
@@ -322,9 +322,10 @@ namespace RikusGameDevToolbox.Geometry2d
         }
 
         public override bool Equals(object obj) => obj is Polygon other && Equals(other);
+        /*
         public static bool operator == (Polygon p1, Polygon p2) => p1.Equals(p2);
         public static bool operator != (Polygon p1, Polygon p2) => !p1.Equals(p2);
-        
+        */
         public override int GetHashCode()
         {
             return (_points != null ? _points.GetHashCode() : 0);
