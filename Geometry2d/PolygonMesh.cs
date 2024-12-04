@@ -24,7 +24,7 @@ namespace RikusGameDevToolbox.Geometry2d
         {
             while (NeighboursOf(polygon).Count > 0)
             {
-                MarkAsNotNeigbours(polygon, NeighboursOf(polygon)[0]);
+                MarkAsNotNeighbours(polygon, NeighboursOf(polygon)[0]);
             }
             _neighbours.Remove(polygon);
             Polygons.Remove(polygon);
@@ -36,7 +36,7 @@ namespace RikusGameDevToolbox.Geometry2d
             _neighbours[polygon2].Add(polygon1);
         }
         
-        public void MarkAsNotNeigbours(Polygon polygon1, Polygon polygon2)
+        public void MarkAsNotNeighbours(Polygon polygon1, Polygon polygon2)
         {
             _neighbours[polygon1].Remove(polygon2);
             _neighbours[polygon2].Remove(polygon1);

@@ -20,6 +20,8 @@ namespace RikusGameDevToolbox.Geometry2d
             }
         }
         
+        public float Length => Vector2.Distance(Point1, Point2);
+        
         
         public bool Equals(Edge e) => Point1 == e.Point1 && Point2 == e.Point2;
         public override bool Equals(object obj) => obj is Edge edge && Equals(edge);

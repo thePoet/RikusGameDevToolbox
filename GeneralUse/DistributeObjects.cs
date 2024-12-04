@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using RikusGameDevToolbox.Geometry2d;
 using UnityEngine;
 using Random = UnityEngine.Random;
 
@@ -37,9 +38,25 @@ namespace RikusGameDevToolbox.GeneralUse
             return Poisson(RandomPointInCircle, minSpacing, IsInCircle, existingPoints);
         }
 
+        /// <summary>
+        /// Returns a list of Vector2 positions that are randomly yet tightly spaced in a circle using
+        /// Poisson disk sampling algorithm. 
+        /// </summary>
+        /// <param name="polygon">The polygon</param>
+        /// <param name="minSpacing">Minimum distance between positions.</param>
+        /// <param name="existingPoints">Already existing positions. Note that these are not included in the result.</param>
+        public static List<Vector2> InPolygon(Polygon polygon, float minSpacing, IEnumerable<Vector2> existingPoints = null)
+        {
+            // TODO: the random function is not very good if polygon is small compared to it's bounding box
+            Vector2 RandomPoint() => polygon.Bounds().RandomPointInside();
+            bool IsInside(Vector2 position) => polygon.IsPointInside(position);
+            return Poisson(RandomPoint, minSpacing, IsInside, existingPoints);
+        }
+
+
         // Poisson disk sampling algorithm based on: http://devmag.org.za/2009/05/03/poisson-disk-sampling/
         private static List<Vector2> Poisson(Func<Vector2> randomPoint, float minSpacing, Func<Vector2, bool> isInArea,
-        IEnumerable<Vector2> existingPoints = null, int numTriesToGeneratePoint = 30)
+        IEnumerable<Vector2> existingPoints = null, int numTriesToGeneratePoint = 100)
         {
             float cellSize = minSpacing / Mathf.Sqrt(2);
             Dictionary<(int, int), Vector2> grid = new();

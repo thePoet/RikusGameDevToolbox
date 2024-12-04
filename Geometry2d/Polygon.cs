@@ -196,6 +196,11 @@ namespace RikusGameDevToolbox.Geometry2d
         {
             return (float)Clipper.Area(_pathD);
         }
+        
+        public float Circumference()
+        {
+            return Edges().Sum(edge => edge.Length);
+        }
 
         public bool IsConvex()
         {
