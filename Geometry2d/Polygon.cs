@@ -3,17 +3,20 @@ using System.Collections.Generic;
 using System.Linq;
 using RikusGameDevToolbox.GeneralUse;
 using UnityEngine;
+using UnityEngine.Assertions;
+using Clipper2Lib;
 
 namespace RikusGameDevToolbox.Geometry2d
 {
     /// A polygon in 2D space
-    /// Holes, self-intersections and duplicate points are not allowed.
+    /// No holes, self-intersections or duplicate points allowed.
+    /// Uses Angus Johnson's awesome Clipper2 library..
     [Serializable]
-    public struct Polygon : IEquatable<Polygon>
+    public class Polygon : IEquatable<Polygon>
     {
         
         // An intersection of the outlines of two Polygon2D:s.
-        struct OutlineIntersection
+        private struct OutlineIntersection
         {
             public Vector2 IntersectionPosition;
             public int PointIdx1; // OutlineIntersection is between _points PointIdx1 and PointIdx2
@@ -22,11 +25,15 @@ namespace RikusGameDevToolbox.Geometry2d
             public override string ToString() => $"Intersection of {PointIdx1} and {PointIdx2} at {IntersectionPosition} is start: {IsStartOfIntersectingArea}"; 
         }
 
-        public Vector2[] Points => _points.ToArray();
-        
+        public List<Vector2> Points
+        {
+            get => _points;
+            set => SetPoints(value);
+        }
+
         [SerializeField]
         private List<Vector2> _points;
-    
+        private PathD _pathD;
 
         #region ------------------------------------------ PUBLIC METHODS -----------------------------------------------
         
@@ -35,11 +42,6 @@ namespace RikusGameDevToolbox.Geometry2d
         /// </summary>
         public static Polygon CreateRegular(int numSides, float radius)
         {
-            if (numSides < 3)
-            {
-                throw new ArgumentException("A polygon must have at least 3 sides.");
-            }
-            
             var points = new Vector2[numSides];
             for (int i = 0; i < numSides; i++)
             {
@@ -52,6 +54,7 @@ namespace RikusGameDevToolbox.Geometry2d
         
         /// <summary>
         /// Attemps to creates a polygon from the given unordered points. Works if the polygon is convex or nearly so.
+        /// Return null if it fails.
         /// </summary>
         public static Polygon FromUnorderedPoints(IEnumerable<Vector2> points)
         {
@@ -59,6 +62,7 @@ namespace RikusGameDevToolbox.Geometry2d
             Vector2 center = new Vector2(list.Average(p => p.x), list.Average(p => p.y));
             
             list.Sort(SortByAngle);
+            if (!IsInClockwiseOrder(ToPathD(list))) return null;
             return new Polygon( list );
             
             int SortByAngle(Vector2 p1, Vector2 p2)
@@ -69,41 +73,115 @@ namespace RikusGameDevToolbox.Geometry2d
             }
    
         }
+
+        /// <summary>
+        /// Returns the intersections (AND) of two polygons i.e. the areas that are common to both polygons.
+        /// Intersections are sorted by area in descending order.
+        /// </summary>
+        public static List<Polygon> Intersection(Polygon poly1, Polygon poly2)
+        {
+            List<Polygon> intersections = new List<Polygon>();
+            PathsD intersection = Clipper.Intersect(poly1.ToPathsD(), poly2.ToPathsD(), FillRule.EvenOdd, 8);
+            foreach(var pathd in intersection)
+            {
+                pathd.Reverse();
+                intersections.Add(new Polygon(pathd));
+            }
+            SortByAreaDescending(intersections);
+            return intersections;
+        }
+        
+
         
         /// <summary>
-        /// Constructor for a polygon with the given points.
+        /// Returns the union (OR) of two polygons. Returns null if the polygons do not intersect. 
         /// </summary>
-        /// <param name="points">Points of the of polygon in clockwise order.</param>
-        public Polygon(IEnumerable<Vector2> points)
+        public static Polygon Union(Polygon poly1, Polygon poly2)
         {
-            _points = new List<Vector2>(points);
+            PathsD union = Clipper.Union(poly1.ToPathsD(), poly2.ToPathsD(), FillRule.EvenOdd, 8);
+            if (union.Count != 1) return null;
+            union[0].Reverse();
+            return new Polygon(union[0]);
+        }
+        
+        /// <summary>
+        /// Returns the polygon that is poly1 NOT poly2 i.e. subtracts poly2 from poly1.
+        /// The resulting polygons are sorted by area in descending order.
+        /// </summary>
+        public static List<Polygon> Subtract(Polygon poly1, Polygon poly2)
+        {
+            List<Polygon> result = new List<Polygon>();
+            PathsD diffs = Clipper.Difference(poly1.ToPathsD(), poly2.ToPathsD(), FillRule.EvenOdd, 8);
+            foreach(var pathd in diffs)
+            {
+                pathd.Reverse();
+                result.Add(new Polygon(pathd));
+            }
+            SortByAreaDescending(result);
+            return result;
         }
 
         /// <summary>
-        /// Is a point inside the polygon?
+        /// Inflates/deflates the polygon by the given amount. 
+        /// Creates new polygon(s) so that their outline is parallel to original
+        /// The resulting list of polygons are sorted by area in descending order.
+        /// </summary>
+        /// <param name="polygon"></param>
+        /// <param name="amount">Distance between old and new outline.</param>
+        /// <returns>List of resulting polygons descending from the largest by area.</returns>
+        public static List<Polygon> Inflate(Polygon polygon, float amount)
+        {
+            var paths = Clipper.InflatePaths(polygon.ToPathsD(), amount, JoinType.Miter, EndType.Polygon);
+            List<Polygon> result = new List<Polygon>();
+            foreach(var pathd in paths)
+            {
+                result.Add(new Polygon(pathd));
+            }
+            SortByAreaDescending(result);
+            return result;
+        }
+
+        /// <summary>
+        /// Constructor for a polygon with the given points. 
+        /// </summary>
+        /// <param name="points">Points of the of polygon  clockwise order.</param>
+        public Polygon(IEnumerable<Vector2> points)
+        {
+            SetPoints(points);
+        }
+
+        /// <summary>
+        /// Is the point inside the polygon or on the edge of it?
         /// </summary>
         public bool IsPointInside(Vector2 point)
         {
-            Vector2 pointFarAway = new Vector2(10001000f, 10003000f);
-            int numIntersections = 0;
-            foreach ((int a, int b) in PointIndicesForEdges())
-            {
-                if (Math2d.AreLineSegmentsIntersecting(point, pointFarAway, _points[a], _points[b])) numIntersections++;
-            }
-            return numIntersections % 2 == 1;
-        }
-
-
-        public override string ToString()
-        {
-            string result = "Polygon with " + _points.Count + "  points: ";
-            foreach (var point in _points)
-            {
-                result += point + " ";
-            }
-            return result;
+            return Clipper.PointInPolygon(ToPointD(point), _pathD) is PointInPolygonResult.IsInside;
         }
         
+        /// <summary>
+        /// Is the point on the edge of the polygon?
+        /// </summary>
+        public bool IsPointOnEdge(Vector2 point)
+        {
+            return Clipper.PointInPolygon(ToPointD(point), _pathD) is PointInPolygonResult.IsOn;
+        }
+        
+        public bool IsIntersecting(Polygon other)
+        {
+            var polygon = this;
+            return _points.Any(p => other.IsPointInside(p)) || other._points.Any(p => polygon.IsPointInside(p));
+        }
+
+
+
+        /// <summary>
+        /// Return true if all the points of this polygon are inside or on the edge of the other polygon. 
+        /// </summary>
+        public bool IsInsideOf(Polygon other)
+        {
+            return _points.All(p=> other.IsPointInside(p) || other.IsPointOnEdge(p));
+        }
+  
         public IEnumerable<Edge> Edges()
         {
             foreach ((int a, int b) in PointIndicesForEdges())
@@ -111,31 +189,44 @@ namespace RikusGameDevToolbox.Geometry2d
                 yield return new Edge(_points[a], _points[b]);
             }
         }
-
-        public bool IsOutlineIntersecting(Polygon other)
-        {
-            foreach (var e1 in Edges())
-            {
-                foreach (var e2 in other.Edges())
-                {
-                    if (Math2d.AreLineSegmentsIntersecting(e1.Point1, e1.Point2, e2.Point1, e2.Point2)) return true;
-                }
-            }
-
-            return false;
-        }
-        
         
         public bool IsSharingVerticesWith(Polygon other) => _points.Any(point => other._points.Contains(point));
+
+        public float Area()
+        {
+            return (float)Clipper.Area(_pathD);
+        }
         
+        public float Circumference()
+        {
+            return Edges().Sum(edge => edge.Length);
+        }
 
+        public bool IsConvex()
+        {
+            for (int i = 0; i < _points.Count; i++)
+            {
+                Vector2 p0 = _points[i];
+                Vector2 p1 = _points[(i + 1) % _points.Count];
+                Vector2 p2 = _points[(i + 2) % _points.Count];
 
-   
+                Vector2 v1 = p1 - p0;
+                Vector2 v2 = p2 - p1;
+
+                float crossProduct = v1.x * v2.y - v1.y * v2.x;
+                if (crossProduct > 0f) return false;
+            }
+            return true;
+        }
+
+        public Polygon Translate(Vector2 offset)
+        {
+            return ForEachPoint(p => p + offset);
+        }
 
         public Polygon Transform(Transform transform)
         {
             return ForEachPoint(p => transform.TransformPoint(p));
-          
         }
 
         public Polygon InverseTransform(Transform transform)
@@ -148,6 +239,9 @@ namespace RikusGameDevToolbox.Geometry2d
             return new Polygon(_points);
         }
 
+        /// <summary>
+        /// Return new polygon with the given method applied to each point.
+        /// </summary>
         public Polygon ForEachPoint(Func<Vector2, Vector2> func)
         {
             return new Polygon(_points.Select(func));
@@ -155,6 +249,7 @@ namespace RikusGameDevToolbox.Geometry2d
 
         public int NumSharedVerticesWith(Polygon other)
         {
+            //Todo: Make more efficient
             int result = 0;
             foreach (var myPoint in _points)
             {
@@ -225,30 +320,130 @@ namespace RikusGameDevToolbox.Geometry2d
                 }
             
             }
-            
-     
+        }
+
+        public Rect Bounds()
+        {
+            var bounds = new Rect();
+            bounds.Bound(_points);
+            return bounds;
         }
         
+        public Vector2 AverageOfPoints()
+        {
+            Vector2 sum = Vector2.zero;
+            foreach (var point in _points)
+            {
+                sum += point;
+            }
+            return sum / _points.Count;
+        }
+        
+        public Vector2 Centroid()
+        {
+            // https://stackoverflow.com/a/34732659
+
+            var centroid = Vector2.zero;
+            float area = 0;
+
+            for (int i = 0; i < _points!.Count; i++)
+            {
+                int i2 = i == _points.Count - 1 ? 0 : i + 1;
+
+                float xi = _points[i].x;
+                float yi = _points[i].y;
+                float xi2 = _points[i2].x;
+                float yi2 = _points[i2].y;
+
+                float mult = (xi * yi2 - xi2 * yi) / 3f;
+        
+                Vector2 add = mult * new Vector2( xi + xi2, yi + yi2 );
+             
+                float addArea = xi * yi2 - xi2 * yi;
+
+                if (i == 0)
+                {
+                    centroid = add;
+                    area = addArea;
+                }
+                else
+                {
+                    centroid += add;
+                    area += addArea;
+                }
+            }
+          
+            centroid /= area;
+
+            return centroid;
+        }
+        
+        
+        // TODO: Make more efficient
         public bool Equals(Polygon other)
         {
+            if (other == null) return false;
             bool sameNumberOfPoints = _points.Count == other._points.Count;
             bool samePoints = _points.All(point => other._points.Contains(point));
             return sameNumberOfPoints && samePoints;
         }
-
-        public override bool Equals(object obj) => obj is Polygon other && Equals(other);
-        public static bool operator == (Polygon p1, Polygon p2) => p1.Equals(p2);
-        public static bool operator != (Polygon p1, Polygon p2) => !p1.Equals(p2);
         
-        public override int GetHashCode()
+        public override string ToString()
         {
-            return (_points != null ? _points.GetHashCode() : 0);
+            string result = "Polygon with " + _points.Count + "  points: ";
+            foreach (var point in _points)
+            {
+                result += point + " ";
+            }
+            return result;
+        }
+
+        public void DrawWithGizmos()
+        {
+            Gizmos.color = Color.green;
+            foreach (var edge in Edges())
+            {
+                Gizmos.DrawLine(edge.Point1, edge.Point2);
+            }
         }
         
         #endregion
 
         #region ------------------------------------------ PRIVATE METHODS ----------------------------------------------
         
+        private static void SortByAreaDescending(List<Polygon> list)
+        {
+            list.Sort((a, b) => b.Area().CompareTo(a.Area()));
+        }
+
+        private void SetPoints(IEnumerable<Vector2> points)
+        {
+            _points = new List<Vector2>(points);
+            if (_points.Count() < 3)
+            {
+                throw new ArgumentException("A polygon must have at least 3 sides.");
+            }
+            _pathD = ToPathD(_points);
+            Assert.IsTrue(IsInClockwiseOrder(_pathD), "Polygon's points must be given in clockwise order.");
+        }
+        
+        private Polygon(PathD path)
+        {
+            _pathD = path;
+            _points = new List<Vector2>();
+            foreach (var point in _pathD)
+            {
+                _points.Add(new Vector2((float)point.x, (float)point.y));
+            }
+            Assert.IsTrue(IsInClockwiseOrder(_pathD), "Polygon's points must be given in clockwise order.");
+        }
+
+        private static PointD ToPointD(Vector2 point) => new (point.x, point.y);
+        
+        private static PathD ToPathD(IEnumerable<Vector2> points) => new (points.Select(ToPointD));
+        
+        private static bool IsInClockwiseOrder(PathD pathD) => !Clipper.IsPositive(pathD);
+
         private static List<OutlineIntersection> OutlineIntersections(Polygon a, Polygon b)
         {
             List<OutlineIntersection> intersections = new List<OutlineIntersection>();
@@ -292,6 +487,8 @@ namespace RikusGameDevToolbox.Geometry2d
             return intersections;
         }
 
+        private PathsD ToPathsD() => new PathsD { _pathD };
+        
         // Returns indices for the starts and ends of edges (0,1), (1,2), (2,3), ..., (n-1,0)
         // where n is the number of edges in the polygon.
         private IEnumerable<(int, int)> PointIndicesForEdges()
@@ -301,19 +498,8 @@ namespace RikusGameDevToolbox.Geometry2d
                 yield return i == _points.Count - 1 ? (i, 0) : (i, i + 1);
             }
         }
-
-
-                
-        Vector2 AverageOfPoints()
-        {
-            Vector2 sum = Vector2.zero;
-            foreach (var point in _points)
-            {
-                sum += point;
-            }
-            return sum / _points.Count;
-        }
         
+
 
         #endregion
 

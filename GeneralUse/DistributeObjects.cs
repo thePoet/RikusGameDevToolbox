@@ -1,5 +1,7 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
+using RikusGameDevToolbox.Geometry2d;
 using UnityEngine;
 using Random = UnityEngine.Random;
 
@@ -37,9 +39,26 @@ namespace RikusGameDevToolbox.GeneralUse
             return Poisson(RandomPointInCircle, minSpacing, IsInCircle, existingPoints);
         }
 
+        /// <summary>
+        /// Returns a list of Vector2 positions that are inside polygon using
+        /// Poisson disk sampling algorithm.
+        /// NOTE: This does not work well with polygons with complicated shapes.
+        /// </summary>
+        /// <param name="polygon">The polygon</param>
+        /// <param name="minSpacing">Minimum distance between positions.</param>
+        /// <param name="existingPoints">Already existing positions. Note that these are not included in the result.</param>
+        public static List<Vector2> InPolygon(Polygon polygon, float minSpacing, IEnumerable<Vector2> existingPoints = null)
+        {
+            // TODO: the random function is not very good if polygon is small compared to it's bounding box
+            Vector2 RandomPoint() => polygon.Bounds().RandomPointInside();
+            bool IsInside(Vector2 position) => polygon.IsPointInside(position);
+            return Poisson(RandomPoint, minSpacing, IsInside, existingPoints);
+        }
+
+
         // Poisson disk sampling algorithm based on: http://devmag.org.za/2009/05/03/poisson-disk-sampling/
         private static List<Vector2> Poisson(Func<Vector2> randomPoint, float minSpacing, Func<Vector2, bool> isInArea,
-        IEnumerable<Vector2> existingPoints = null, int numTriesToGeneratePoint = 30)
+        IEnumerable<Vector2> existingPoints = null, int numTriesToGeneratePoint = 50)
         {
             float cellSize = minSpacing / Mathf.Sqrt(2);
             Dictionary<(int, int), Vector2> grid = new();
@@ -64,10 +83,12 @@ namespace RikusGameDevToolbox.GeneralUse
             List<Vector2> samplePoints = new();
 
 
+            // The poinst are generating starting from the point randomized below.
+            // TODO: If the rest of the area is not easily reachable from the first point, the result will be bad.
             for (int i = 0; i < numTriesToGeneratePoint; i++)
             {
                 Vector2 firstPoint = randomPoint();
-                if (!IsTooCloseToExistingPoints(firstPoint))
+                if (!IsTooCloseToExistingPoints(firstPoint) && isInArea(firstPoint))
                 {
                     processList.Add(firstPoint);
                     samplePoints.Add(firstPoint);
@@ -89,8 +110,10 @@ namespace RikusGameDevToolbox.GeneralUse
                         samplePoints.Add(newPoint);
                         grid.Add(GridIndex(newPoint), newPoint);
                     }
+         
                 }
             }
+         
             return samplePoints;
             
 
@@ -106,23 +129,11 @@ namespace RikusGameDevToolbox.GeneralUse
 
             bool IsTooCloseToExistingPoints(Vector2 point)
             {
-                foreach (var nearbyPoint in NearbyPoints(point))
-                {
-                    if (Vector2.Distance(point, nearbyPoint) < minSpacing)
-                    {
-                        return true;
-                    }
-                }
-
-                foreach (var otherPoint in existingPointsNotFittingInGrid)
-                {
-                    if (Vector2.Distance(point, otherPoint) < minSpacing)
-                    {
-                        return true;
-                    }
-                }
-                return false;
+                if (NearbyPoints(point).Any(p => IsTooClose(p,point))) return true;
+                return existingPointsNotFittingInGrid.Any(p => IsTooClose(p,point));
             }
+            
+            bool IsTooClose(Vector2 point1, Vector2 point2) => Vector2.Distance(point1, point2) < minSpacing;
             
             // Returns points on grid that are within 2 grid cells of the given point i.e.
             // possibly within minSpacing distance.

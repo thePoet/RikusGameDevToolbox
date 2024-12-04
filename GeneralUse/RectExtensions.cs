@@ -27,6 +27,11 @@ namespace RikusGameDevToolbox.GeneralUse
                 if (point.y > r.max.y) r.max = new Vector2(r.max.x, point.y);
             }
         }
+
+        public static Vector2 RandomPointInside(this Rect r)
+        {
+            return new Vector2(Random.Range(r.min.x, r.max.x), Random.Range(r.min.y, r.max.y));
+        }
      
         
         public static Rect Shrink(this Rect r, float amount) => Grow(r, -amount);
