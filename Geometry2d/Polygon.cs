@@ -104,6 +104,23 @@ namespace RikusGameDevToolbox.Geometry2d
             return new Polygon(union[0]);
         }
         
+        public static List<Polygon> Union(List<Polygon> polygons)
+        {
+            PathsD union = new();
+            foreach (var polygon in polygons)
+            {
+                union = Clipper.Union(union, polygon.ToPathsD(), FillRule.EvenOdd, 8);
+            }
+ 
+            List<Polygon> result = new();
+            for (int i=0; i<union.Count; i++)
+            {
+                union[i].Reverse();
+                result.Add(new Polygon(union[i]));
+            }
+            return result;
+        }
+        
         /// <summary>
         /// Returns the polygon that is poly1 NOT poly2 i.e. subtracts poly2 from poly1.
         /// The resulting polygons are sorted by area in descending order.
