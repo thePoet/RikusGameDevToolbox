@@ -34,6 +34,7 @@ namespace RikusGameDevToolbox.Geometry2d
         [SerializeField]
         private List<Vector2> _points;
         private PathD _pathD;
+        private const float Epsilon = 0.1f;
 
         #region ------------------------------------------ PUBLIC METHODS -----------------------------------------------
         
@@ -94,7 +95,8 @@ namespace RikusGameDevToolbox.Geometry2d
 
         
         /// <summary>
-        /// Returns the union (OR) of two polygons. Returns null if the polygons do not intersect. 
+        /// Returns the union (OR) of two polygons. Returns null if the polygons do not intersect or if the union has
+        /// a hole in it. 
         /// </summary>
         public static Polygon Union(Polygon poly1, Polygon poly2)
         {
@@ -103,7 +105,12 @@ namespace RikusGameDevToolbox.Geometry2d
             union[0].Reverse();
             return new Polygon(union[0]);
         }
-        
+
+        /// <summary>
+        /// Returns the union (OR) of the given polygons 
+        /// </summary>
+        /// <param name="polygons"></param>
+        /// <returns>List of Polygons of the union. Null if there is a hole in the union.</returns>
         public static List<Polygon> Union(List<Polygon> polygons)
         {
             PathsD union = new();
@@ -115,6 +122,7 @@ namespace RikusGameDevToolbox.Geometry2d
             List<Polygon> result = new();
             for (int i=0; i<union.Count; i++)
             {
+                if (!Clipper.IsPositive(union[i])) return null; // Hole in the union
                 union[i].Reverse();
                 result.Add(new Polygon(union[i]));
             }
@@ -206,8 +214,13 @@ namespace RikusGameDevToolbox.Geometry2d
                 yield return new Edge(_points[a], _points[b]);
             }
         }
-        
-        public bool IsSharingVerticesWith(Polygon other) => _points.Any(point => other._points.Contains(point));
+
+        public bool IsSharingVerticesWith(Polygon other)
+        {
+           return _points.Any(point1 => other._points.Any(point2 => SamePoint(point1,point2)));
+           
+           bool SamePoint(Vector2 p1, Vector2 p2) => Vector2.Distance(p1, p2) < Epsilon;
+        }
 
         public float Area()
         {
@@ -446,13 +459,17 @@ namespace RikusGameDevToolbox.Geometry2d
         
         private Polygon(PathD path)
         {
+            if (!IsInClockwiseOrder(path))
+            {
+                path.Reverse();
+            }
+            
             _pathD = path;
             _points = new List<Vector2>();
             foreach (var point in _pathD)
             {
                 _points.Add(new Vector2((float)point.x, (float)point.y));
             }
-            Assert.IsTrue(IsInClockwiseOrder(_pathD), "Polygon's points must be given in clockwise order.");
         }
 
         private static PointD ToPointD(Vector2 point) => new (point.x, point.y);
