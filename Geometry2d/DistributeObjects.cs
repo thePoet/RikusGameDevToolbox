@@ -1,11 +1,11 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using RikusGameDevToolbox.Geometry2d;
+using RikusGameDevToolbox.GeneralUse;
 using UnityEngine;
 using Random = UnityEngine.Random;
 
-namespace RikusGameDevToolbox.GeneralUse
+namespace RikusGameDevToolbox.Geometry2d
 {
     public static class DistributeObjects
     {
@@ -44,14 +44,14 @@ namespace RikusGameDevToolbox.GeneralUse
         /// Poisson disk sampling algorithm.
         /// NOTE: This does not work well with polygons with complicated shapes.
         /// </summary>
-        /// <param name="simplePolygon">The polygon</param>
+        /// <param name="polygon">The polygon</param>
         /// <param name="minSpacing">Minimum distance between positions.</param>
         /// <param name="existingPoints">Already existing positions. Note that these are not included in the result.</param>
-        public static List<Vector2> InPolygon(SimplePolygon simplePolygon, float minSpacing, IEnumerable<Vector2> existingPoints = null)
+        public static List<Vector2> InPolygon(Polygon polygon, float minSpacing, IEnumerable<Vector2> existingPoints = null)
         {
             // TODO: the random function is not very good if polygon is small compared to it's bounding box
-            Vector2 RandomPoint() => simplePolygon.Bounds().RandomPointInside();
-            bool IsInside(Vector2 position) => simplePolygon.IsPointInside(position);
+            Vector2 RandomPoint() => polygon.Bounds().RandomPointInside();
+            bool IsInside(Vector2 position) => polygon.IsPointInside(position);
             return Poisson(RandomPoint, minSpacing, IsInside, existingPoints);
         }
 

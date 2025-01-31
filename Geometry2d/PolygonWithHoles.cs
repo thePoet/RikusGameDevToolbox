@@ -9,9 +9,19 @@ namespace RikusGameDevToolbox.Geometry2d
     public class PolygonWithHoles : Polygon
     {
         ///Returns vertices of a hole in CW order
-        public Vector2[] Hole(int index) => Paths[index+1].Select(p => new Vector2((float)p.x, (float)p.y)).ToArray();
+       // public Vector2[] Hole(int index) => Paths[index+1].Select(p => new Vector2((float)p.x, (float)p.y)).ToArray();
+        
+       // public SimplePolygon Hole(int index) => new SimplePolygon(Paths[index+1]);
         
         public int NumHoles => Mathf.Max(0, Paths.Count - 1);
+
+        public SimplePolygon Hole(int holeIndex)
+        {
+            if (holeIndex < 0 || holeIndex >= NumHoles) return null;
+            PathD path = new PathD(Paths[holeIndex + 1]);
+            path.Reverse();
+            return new SimplePolygon(path);
+        }
         
         internal PolygonWithHoles(PathsD paths)
         {

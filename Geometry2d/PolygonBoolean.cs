@@ -1,11 +1,10 @@
-using System;
 using System.Collections.Generic;
 using Clipper2Lib;
 
 
 namespace RikusGameDevToolbox.Geometry2d
 {
-    public static class PolygonBooleanOperations
+    public static class PolygonBoolean
     {
         #region ------------------------------------------ PUBLIC METHODS -----------------------------------------------
          /// <summary>
@@ -18,7 +17,7 @@ namespace RikusGameDevToolbox.Geometry2d
             clipper.AddSubject(a.Paths);
             clipper.AddSubject(b.Paths);
             clipper.Execute(ClipType.Union, FillRule.NonZero, polytree);
-            return ToPolygons(polytree);
+            return PolygonTools.ToPolygons(polytree);
         }
 
         
@@ -34,7 +33,7 @@ namespace RikusGameDevToolbox.Geometry2d
                 clipper.AddSubject(polygon.Paths);
             }
             clipper.Execute(ClipType.Union, FillRule.NonZero, polytree);
-            return ToPolygons(polytree);
+            return PolygonTools.ToPolygons(polytree);
         }
         
         /// <summary>
@@ -48,7 +47,7 @@ namespace RikusGameDevToolbox.Geometry2d
             clipper.AddSubject(a.Paths);
             clipper.AddClip(b.Paths);
             clipper.Execute(ClipType.Intersection, FillRule.NonZero, polytree);
-            return ToPolygons(polytree);
+            return PolygonTools.ToPolygons(polytree);
         }
 
         /// <summary>
@@ -61,7 +60,7 @@ namespace RikusGameDevToolbox.Geometry2d
             clipper.AddSubject(poly1.Paths);
             clipper.AddClip(poly2.Paths);
             clipper.Execute(ClipType.Difference, FillRule.NonZero, polytree);
-            return ToPolygons(polytree);
+            return PolygonTools.ToPolygons(polytree);
         }
         
         /// <summary>
@@ -80,49 +79,9 @@ namespace RikusGameDevToolbox.Geometry2d
                 clipper.AddClip(polygon.Paths);
             }
             clipper.Execute(ClipType.Difference, FillRule.NonZero, polytree);
-            return ToPolygons(polytree);
+            return PolygonTools.ToPolygons(polytree);
         }
 
         #endregion
-        #region ------------------------------------------ PRIVATE METHODS ----------------------------------------------
-
-        private static List<Polygon> ToPolygons(PolyTreeD tree)
-        {
-            var result = new List<Polygon>();
-
-            foreach (PolyPathD pp in tree)
-            {
-                ProcessPolygon(pp);
-            }
-            return result;
-
-
-            void ProcessPolygon(PolyPathD polyPath)
-            {
-                if (polyPath.IsHole) throw new ArgumentException("ProcessPolygon called with a hole.");
-                
-                if (polyPath.Count==0) // No holes
-                {
-                    result.Add(new SimplePolygon(polyPath.Polygon));
-                    return;
-                }
-                
-                PathsD paths = new();
-                paths.Add(polyPath.Polygon);
-                foreach (PolyPathD child in polyPath)
-                {
-                    if (!child.IsHole) throw new ArgumentException("ProcessPolygon called with a non-hole child.");
-                    paths.Add(child.Polygon);
-                    foreach (PolyPathD grandChild in child) // The islands inside the hole
-                    {
-                        ProcessPolygon(grandChild);
-                    }
-                }
-                
-                result.Add(new PolygonWithHoles(paths));
-            }
-            #endregion
-        }
-        
     }
 }

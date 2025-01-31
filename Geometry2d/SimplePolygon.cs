@@ -1,7 +1,6 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using RikusGameDevToolbox.GeneralUse;
 using UnityEngine;
 using Clipper2Lib;
 
@@ -13,12 +12,6 @@ namespace RikusGameDevToolbox.Geometry2d
     [Serializable]
     public class SimplePolygon : Polygon, IEquatable<SimplePolygon>
     {
-        private List<Vector2> Points
-        {
-            get => _points;
-            set => SetPoints(value);
-        }
-
         [SerializeField]
         private List<Vector2> _points;
         private const float Epsilon = 0.01f;
@@ -33,6 +26,7 @@ namespace RikusGameDevToolbox.Geometry2d
         /// <param name="simplePolygon"></param>
         /// <param name="amount">Distance between old and new outline.</param>
         /// <returns>List of resulting polygons descending from the largest by area.</returns>
+       /*
         public static List<SimplePolygon> Inflate(SimplePolygon simplePolygon, float amount)
         {
             var paths = Clipper.InflatePaths(simplePolygon.Paths, amount, JoinType.Miter, EndType.Polygon);
@@ -50,7 +44,7 @@ namespace RikusGameDevToolbox.Geometry2d
                 list.Sort((a, b) => b.Area.CompareTo(a.Area));
             }
 
-        }
+        }*/
 
         /// <summary>
         /// Constructor for a polygon with the given points. 
@@ -66,27 +60,13 @@ namespace RikusGameDevToolbox.Geometry2d
             SetPoints(points);
         }
 
-        /// <summary>
-        /// Is the point inside the polygon or on the edge of it?
-        /// </summary>
-        public bool IsPointInside(Vector2 point)
-        {
-            
-            return Clipper.PointInPolygon(ToPointD(point), Paths[0]) is PointInPolygonResult.IsInside;
-        }
-        
-        /// <summary>
-        /// Is the point on the edge of the polygon?
-        /// </summary>
-        public bool IsPointOnEdge(Vector2 point)
-        {
-            return Clipper.PointInPolygon(ToPointD(point), Paths[0]) is PointInPolygonResult.IsOn;
-        }
+
          
         public bool IsIntersecting(SimplePolygon other)
         {
             var polygon = this;
-            return _points.Any(p => other.IsPointInside(p)) || other._points.Any(p => polygon.IsPointInside(p));
+            return _points.Any(p => other.IsPointInside(p) || other.IsPointOnEdge(p)) || 
+                   other._points.Any(p => polygon.IsPointInside(p) || polygon.IsPointOnEdge(p));
         }
 
 
@@ -99,13 +79,7 @@ namespace RikusGameDevToolbox.Geometry2d
             return _points.All(p=> other.IsPointInside(p) || other.IsPointOnEdge(p));
         }
   
-        public IEnumerable<Edge> Edges()
-        {
-            foreach ((int a, int b) in PointIndicesForEdges())
-            {
-                yield return new Edge(_points[a], _points[b]);
-            }
-        }
+ 
 
         public bool IsSharingVerticesWith(SimplePolygon other)
         {
@@ -114,10 +88,7 @@ namespace RikusGameDevToolbox.Geometry2d
            bool SamePoint(Vector2 p1, Vector2 p2) => Vector2.Distance(p1, p2) < Epsilon;
         }
         
-        public float Circumference()
-        {
-            return Edges().Sum(edge => edge.Length);
-        }
+     
 
         public bool IsConvex()
         {
@@ -176,15 +147,6 @@ namespace RikusGameDevToolbox.Geometry2d
                 }
             }
             return result;
-        }
-
-
-      
-        public Rect Bounds()
-        {
-            var bounds = new Rect();
-            bounds.Bound(_points);
-            return bounds;
         }
         
         public Vector2 AverageOfPoints()
@@ -275,8 +237,9 @@ namespace RikusGameDevToolbox.Geometry2d
             {
                  Debug.LogError("Wrong winding order for creating SimplePolygon from pathD.");
             }
-            
-            Paths = new PathsD { path };
+            // make copy of path
+            PathD pathCopy = new PathD(path);
+            Paths = new PathsD { pathCopy };
             _points = new List<Vector2>();
             foreach (var point in Paths[0])
             {
@@ -301,23 +264,9 @@ namespace RikusGameDevToolbox.Geometry2d
            
 
 
-        private static PointD ToPointD(Vector2 point) => new (point.x, point.y);
-        
-        private static PathD ToPathD(IEnumerable<Vector2> points) => new (points.Select(ToPointD));
-        
 
 
-        
-        // Returns indices for the starts and ends of edges (0,1), (1,2), (2,3), ..., (n-1,0)
-        // where n is the number of edges in the polygon.
-        private IEnumerable<(int, int)> PointIndicesForEdges()
-        {
-            for (int i = 0; i < _points.Count; i++)
-            {
-                yield return i == _points.Count - 1 ? (i, 0) : (i, i + 1);
-            }
-        }
-        
+   
 
 
         #endregion

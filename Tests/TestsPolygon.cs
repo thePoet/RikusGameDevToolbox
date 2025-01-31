@@ -27,29 +27,39 @@ using UnityEngine;
         public void Area()
         {
              Assert.IsTrue( IsAlmostSame(_a.Area, 100f));
-             var subs = PolygonBooleanOperations.Subtract(_a, _e);
-             Debug.Log(subs[0].Contour.Length);
+             var subs = PolygonBoolean.Subtract(_a, _e);
              Assert.IsTrue( IsAlmostSame(subs[0].Area, 99f));
+        }
+        
+        [Test]
+        public void IsInside()
+        {
+
+            var holed = PolygonBoolean.Subtract(_a, _e)[0];
+            Assert.IsTrue( holed.IsPointInside(new Vector2(1,1)));
+            Assert.IsTrue( holed.IsPointOnEdge(new Vector2(0,1)));
+            Assert.IsTrue( !holed.IsPointInside(new Vector2(-1,-1)));
+            Assert.IsTrue( !holed.IsPointInside(new Vector2(5.5f,5.5f)));
         }
  
         [Test]
         public void SimpleUnion()
         {
-            var union = PolygonBooleanOperations.Union(_a, _b);
+            var union = PolygonBoolean.Union(_a, _b);
             Assert.IsTrue(union.Count == 1 && union[0] is SimplePolygon);
         }
 
         [Test]
         public void UnionOfTwoNonOverlappingPolygons()
         {
-            var union = PolygonBooleanOperations.Union(_a, _c);
+            var union = PolygonBoolean.Union(_a, _c);
             Assert.IsTrue(union.Count==2  && union[0] is SimplePolygon && union[1] is SimplePolygon);
         }
         
         [Test]
         public void UnionCreatesPolygonWithHole()
         {
-            var union = PolygonBooleanOperations.Union(_a, _d);
+            var union = PolygonBoolean.Union(_a, _d);
             Assert.IsTrue(union.Count==1);
             Assert.IsTrue(union[0] is PolygonWithHoles);
         }
@@ -58,7 +68,7 @@ using UnityEngine;
         public void UnionCreatesPolygonWithAnotherPolygonInsideHole()
         {
             List<SimplePolygon> polygons = new() { _a, _c, _d };
-            var union = PolygonBooleanOperations.Union(polygons);
+            var union = PolygonBoolean.Union(polygons);
             Assert.IsTrue(union.Count==2);
             Assert.IsTrue((union[0] is PolygonWithHoles && union[1] is SimplePolygon) ||
                           (union[0] is SimplePolygon && union[1] is PolygonWithHoles));
@@ -67,7 +77,7 @@ using UnityEngine;
         [Test]
         public void Intersection()
         {
-            var ins = PolygonBooleanOperations.Intersection(_a, _b);
+            var ins = PolygonBoolean.Intersection(_a, _b);
             Assert.IsTrue(ins.Count==1);
             Assert.IsTrue(ins[0] is SimplePolygon);
             var sp = ins[0] as SimplePolygon; 
@@ -78,7 +88,7 @@ using UnityEngine;
         [Test]
         public void Subtraction()
         {
-            var subs = PolygonBooleanOperations.Subtract(_a, _d);
+            var subs = PolygonBoolean.Subtract(_a, _d);
             Assert.IsTrue(subs.Count==1);
             Assert.IsTrue(subs[0] is SimplePolygon);
             Assert.IsTrue(subs[0].Contour.Length == 12);
@@ -90,7 +100,7 @@ using UnityEngine;
             List<Polygon> a = new List<Polygon> {_a};
             List<Polygon> b = new List<Polygon> {_d, _b};
             
-            var subs = PolygonBooleanOperations.Subtract(a, b);
+            var subs = PolygonBoolean.Subtract(a, b);
             Assert.IsTrue(subs.Count==1);
             Assert.IsTrue(subs[0] is SimplePolygon);
             Assert.IsTrue(subs[0].Contour.Length == 16);
@@ -102,7 +112,7 @@ using UnityEngine;
             List<Polygon> a = new List<Polygon> {_a, _c};
             List<Polygon> b = new List<Polygon> { _d};
             
-            var subs = PolygonBooleanOperations.Subtract(a, b);
+            var subs = PolygonBoolean.Subtract(a, b);
             Assert.IsTrue(subs.Count==2);
             Assert.IsTrue(subs[0] is SimplePolygon);
             Assert.IsTrue(subs[1] is SimplePolygon);

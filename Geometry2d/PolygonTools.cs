@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using Clipper2Lib;
@@ -124,6 +125,44 @@ namespace RikusGameDevToolbox.Geometry2d
             }
         }
          
+        internal static List<Polygon> ToPolygons(PolyTreeD tree)
+        {
+            var result = new List<Polygon>();
+
+            foreach (PolyPathD pp in tree)
+            {
+                ProcessPolygon(pp);
+            }
+            return result;
+
+
+            void ProcessPolygon(PolyPathD polyPath)
+            {
+                if (polyPath.IsHole) throw new ArgumentException("ProcessPolygon called with a hole.");
+                
+                if (polyPath.Count==0) // No holes
+                {
+                    result.Add(new SimplePolygon(polyPath.Polygon));
+                    return;
+                }
+                
+                PathsD paths = new();
+                paths.Add(polyPath.Polygon);
+                foreach (PolyPathD child in polyPath)
+                {
+                    if (!child.IsHole) throw new ArgumentException("ProcessPolygon called with a non-hole child.");
+                    paths.Add(child.Polygon);
+                    foreach (PolyPathD grandChild in child) // The islands inside the hole
+                    {
+                        ProcessPolygon(grandChild);
+                    }
+                }
+                
+                result.Add(new PolygonWithHoles(paths));
+            }
+            
+        }
+
          
         private static List<OutlineIntersection> OutlineIntersections(SimplePolygon a, SimplePolygon b)
         {
