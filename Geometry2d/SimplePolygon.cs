@@ -13,10 +13,7 @@ namespace RikusGameDevToolbox.Geometry2d
     [Serializable]
     public class SimplePolygon : Polygon, IEquatable<SimplePolygon>
     {
-        
-
-
-        public List<Vector2> Points
+        private List<Vector2> Points
         {
             get => _points;
             set => SetPoints(value);
@@ -28,10 +25,6 @@ namespace RikusGameDevToolbox.Geometry2d
 
         #region ------------------------------------------ PUBLIC METHODS -----------------------------------------------
         
-        
-        
-  
-    
         /// <summary>
         /// Inflates/deflates the polygon by the given amount. 
         /// Creates new polygon(s) so that their outline is parallel to original
@@ -50,13 +43,25 @@ namespace RikusGameDevToolbox.Geometry2d
             }
             SortByAreaDescending(result);
             return result;
+            
+            
+            void SortByAreaDescending(List<SimplePolygon> list)
+            {
+                list.Sort((a, b) => b.Area.CompareTo(a.Area));
+            }
+
         }
 
         /// <summary>
         /// Constructor for a polygon with the given points. 
         /// </summary>
-        /// <param name="points">Points of the of polygon  clockwise order.</param>
+        /// <param name="points">Points of the of polygon in counter-clockwise order.</param>
         public SimplePolygon(IEnumerable<Vector2> points)
+        {
+            SetPoints(points);
+        }
+        
+        public void SetContour(IEnumerable<Vector2> points)
         {
             SetPoints(points);
         }
@@ -107,11 +112,6 @@ namespace RikusGameDevToolbox.Geometry2d
            return _points.Any(point1 => other._points.Any(point2 => SamePoint(point1,point2)));
            
            bool SamePoint(Vector2 p1, Vector2 p2) => Vector2.Distance(p1, p2) < Epsilon;
-        }
-
-        public float Area()
-        {
-            return (float)Clipper.Area(Paths[0]);
         }
         
         public float Circumference()
@@ -286,11 +286,7 @@ namespace RikusGameDevToolbox.Geometry2d
         #endregion
         #region ------------------------------------------ PRIVATE METHODS ----------------------------------------------
         
-        private static void SortByAreaDescending(List<SimplePolygon> list)
-        {
-            list.Sort((a, b) => b.Area().CompareTo(a.Area()));
-        }
-
+      
         private void SetPoints(IEnumerable<Vector2> points)
         {
             _points = new List<Vector2>(points);

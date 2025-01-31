@@ -14,7 +14,7 @@ namespace RikusGameDevToolbox.Geometry2d
             public Vector2 IntersectionPosition;
             public int PointIdx1; // OutlineIntersection is between _points PointIdx1 and PointIdx2
             public int PointIdx2;
-            public bool IsStartOfIntersectingArea; // In CW direction
+            public bool IsStartOfIntersectingArea; // In CCW direction
             public override string ToString() => $"Intersection of {PointIdx1} and {PointIdx2} at {IntersectionPosition} is start: {IsStartOfIntersectingArea}"; 
         }
         
@@ -86,7 +86,7 @@ namespace RikusGameDevToolbox.Geometry2d
             {
                 var result = polygonToBeCut.MakeCopy();
 
-                var points = result.Points;
+                var points = result.Contour.ToList();
 
                 if (AreIntersectionInSameEdge()) return result;
               
@@ -133,7 +133,7 @@ namespace RikusGameDevToolbox.Geometry2d
             {
                 foreach ((int b1, int b2) in PointIndicesForEdges(b))
                 {
-                    var result = Math2d.LineSegmentIntersection(a.Points[a1], a.Points[a2], b.Points[b1], b.Points[b2]);
+                    var result = Math2d.LineSegmentIntersection(a.Contour[a1], a.Contour[a2], b.Contour[b1], b.Contour[b2]);
                     if (result.AreIntersecting)
                     {
                         intersections.Add(new OutlineIntersection
@@ -141,7 +141,7 @@ namespace RikusGameDevToolbox.Geometry2d
                             IntersectionPosition = result.intersectionPoint,
                             PointIdx1 = a1,
                             PointIdx2 = a2,
-                            IsStartOfIntersectingArea = Math2d.IsPointLeftOfLine(b.Points[b1], a.Points[a1], a.Points[a2])
+                            IsStartOfIntersectingArea = Math2d.IsPointLeftOfLine(b.Contour[b1], a.Contour[a1], a.Contour[a2])
                         });
                     }
                 }
@@ -173,9 +173,9 @@ namespace RikusGameDevToolbox.Geometry2d
         // where n is the number of edges in the polygon.
         private static IEnumerable<(int, int)> PointIndicesForEdges(SimplePolygon polygon)
         {
-            for (int i = 0; i < polygon.Points.Count; i++)
+            for (int i = 0; i < polygon.Contour.Length; i++)
             {
-                yield return i == polygon.Points.Count - 1 ? (i, 0) : (i, i + 1);
+                yield return i == polygon.Contour.Length - 1 ? (i, 0) : (i, i + 1);
             }
         }
 

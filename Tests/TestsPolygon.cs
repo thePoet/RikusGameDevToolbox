@@ -14,12 +14,23 @@ using UnityEngine;
         private static readonly Vector2[] PointsC = { new(11, 5), new(12, 5), new(12, 6), new(11, 6) };
         private static readonly Vector2[] PointsD = { new(5, 2), new(15, 2), new(15, 9), new(5, 9), new(5, 8), 
                                                       new(14, 8), new(14, 3), new(5, 3) };
+        private static readonly Vector2[] PointsE = { new(5, 5), new(6, 5), new(6, 6), new(5, 6) };
 
         private readonly SimplePolygon _a = new(PointsA);
         private readonly SimplePolygon _b = new(PointsB);
         private readonly SimplePolygon _c = new(PointsC);
         private readonly SimplePolygon _d = new(PointsD);
+        private readonly SimplePolygon _e = new(PointsE);
 
+        
+        [Test]
+        public void Area()
+        {
+             Assert.IsTrue( IsAlmostSame(_a.Area, 100f));
+             var subs = PolygonBooleanOperations.Subtract(_a, _e);
+             Debug.Log(subs[0].Contour.Length);
+             Assert.IsTrue( IsAlmostSame(subs[0].Area, 99f));
+        }
  
         [Test]
         public void SimpleUnion()
@@ -60,9 +71,8 @@ using UnityEngine;
             Assert.IsTrue(ins.Count==1);
             Assert.IsTrue(ins[0] is SimplePolygon);
             var sp = ins[0] as SimplePolygon; 
-             
             Vector2[] expected = {new(5, 5), new(10, 5), new(10, 6), new(5, 6)};
-            Assert.IsTrue(ContainsSamePoints(expected, sp.Points.ToArray()));
+            Assert.IsTrue(ContainsSamePoints(expected, sp.Contour.ToArray()));
         }
 
         [Test]
@@ -98,6 +108,8 @@ using UnityEngine;
             Assert.IsTrue(subs[1] is SimplePolygon);
         }
         
+        bool IsAlmostSame(float a, float b) => Mathf.Abs(a - b) < 0.001f;
+
         // Note: This test is not very robust. It only checks that the points are the same, not the order.
         bool ContainsSamePoints(Vector2[] a, Vector2[] b)
         {

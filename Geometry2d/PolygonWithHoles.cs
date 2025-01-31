@@ -8,9 +8,6 @@ namespace RikusGameDevToolbox.Geometry2d
 {
     public class PolygonWithHoles : Polygon
     {
-        // Returns vertices of the outline of the shape in CCW order
-        public Vector2[] Contour => Paths[0].Select(p => new Vector2((float)p.x, (float)p.y)).ToArray();
-        
         ///Returns vertices of a hole in CW order
         public Vector2[] Hole(int index) => Paths[index+1].Select(p => new Vector2((float)p.x, (float)p.y)).ToArray();
         
@@ -18,7 +15,6 @@ namespace RikusGameDevToolbox.Geometry2d
         
         internal PolygonWithHoles(PathsD paths)
         {
-            
             int numOutlines = paths.Count(Clipper.IsPositive);
             int numHoles = paths.Count(path => !Clipper.IsPositive(path));
             
@@ -27,7 +23,10 @@ namespace RikusGameDevToolbox.Geometry2d
                 throw new ArgumentException("PolygonWithHoles has " + numOutlines + " outlines and " + numHoles + " holes.");
             }
             
+            //NOTE: We don't check if the holes are inside the outline
+            
             ArrangePathsContourFirst(paths);
+            Paths = paths;
          }
         
         // Is this necessary or is contour always first?
