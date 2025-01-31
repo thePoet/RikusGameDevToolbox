@@ -14,15 +14,7 @@ namespace RikusGameDevToolbox.Geometry2d
     public class SimplePolygon : Polygon, IEquatable<SimplePolygon>
     {
         
-        // An intersection of the outlines of two Polygon2D:s.
-        private struct OutlineIntersection
-        {
-            public Vector2 IntersectionPosition;
-            public int PointIdx1; // OutlineIntersection is between _points PointIdx1 and PointIdx2
-            public int PointIdx2;
-            public bool IsStartOfIntersectingArea; // In CW direction
-            public override string ToString() => $"Intersection of {PointIdx1} and {PointIdx2} at {IntersectionPosition} is start: {IsStartOfIntersectingArea}"; 
-        }
+
 
         public List<Vector2> Points
         {
@@ -36,119 +28,10 @@ namespace RikusGameDevToolbox.Geometry2d
 
         #region ------------------------------------------ PUBLIC METHODS -----------------------------------------------
         
-        /// <summary>
-        /// Creates a regular polygon with the given number of sides and radius.
-        /// </summary>
-        public static SimplePolygon CreateRegular(int numSides, float radius)
-        {
-            var points = new Vector2[numSides];
-            for (int i = 0; i < numSides; i++)
-            {
-                points[i] = new Vector2(radius * Mathf.Cos(2 * Mathf.PI * -i / numSides), 
-                    radius * Mathf.Sin(2 * Mathf.PI * -i / numSides)) * radius;
-            }
-
-            return new SimplePolygon(points);
-        }
         
         
-        
-        //TODO: Replace this with gift wrapping algorithm and move it somewhere else.
-        
-        /// <summary>
-        /// Attemps to creates a polygon from the given unordered points. Works if the polygon is convex or nearly so.
-        /// Return null if it fails.
-        /// </summary>
-        public static SimplePolygon FromUnorderedPoints(IEnumerable<Vector2> points)
-        {
-            var list = points.ToList();
-            Vector2 center = new Vector2(list.Average(p => p.x), list.Average(p => p.y));
-            
-            list.Sort(SortByAngle);
-            var path = ToPathD(list);
-            if (!Clipper.IsPositive(path)) return null;
-          
-            return new SimplePolygon( path );
-            
-            int SortByAngle(Vector2 p1, Vector2 p2)
-            {
-                float angle1 = Math2d.GetAngle(Vector2.up, p1-center);
-                float angle2 = Math2d.GetAngle(Vector2.up, p2-center);
-                return angle1.CompareTo(angle2);
-            }
-   
-        }
-
-        /// <summary>
-        /// Returns the intersections (AND) of two polygons i.e. the areas that are common to both polygons.
-        /// Intersections are sorted by area in descending order.
-        /// </summary>
-        public static List<SimplePolygon> Intersection(SimplePolygon poly1, SimplePolygon poly2)
-        {
-            List<SimplePolygon> intersections = new List<SimplePolygon>();
-            PathsD intersection = Clipper.Intersect(poly1.Paths, poly2.Paths, FillRule.EvenOdd, 8);
-            foreach(var pathd in intersection)
-            {
-                pathd.Reverse();
-                intersections.Add(new SimplePolygon(pathd));
-            }
-            SortByAreaDescending(intersections);
-            return intersections;
-        }
-        
-
-        
-        /// <summary>
-        /// Returns the union (OR) of two polygons. Returns null if the polygons do not intersect or if the union has
-        /// a hole in it. 
-        /// </summary>
-        public static SimplePolygon Union(SimplePolygon poly1, SimplePolygon poly2)
-        {
-            PathsD union = Clipper.Union(poly1.Paths, poly2.Paths, FillRule.EvenOdd, 8);
-            if (union.Count != 1) return null;
-            union[0].Reverse();
-            return new SimplePolygon(union[0]);
-        }
-
-        /// <summary>
-        /// Returns the union (OR) of the given polygons 
-        /// </summary>
-        /// <param name="polygons"></param>
-        /// <returns>List of Polygons of the union. Null if there is a hole in the union.</returns>
-        public static List<SimplePolygon> Union(List<SimplePolygon> polygons)
-        {
-            PathsD union = new();
-            foreach (var polygon in polygons)
-            {
-                union = Clipper.Union(union, polygon.Paths, FillRule.EvenOdd, 8);
-            }
- 
-            List<SimplePolygon> result = new();
-            for (int i=0; i<union.Count; i++)
-            {
-                if (!Clipper.IsPositive(union[i])) return null; // Hole in the union
-                result.Add(new SimplePolygon(union[i]));
-            }
-            return result;
-        }
-        
-        /// <summary>
-        /// Returns the polygon that is poly1 NOT poly2 i.e. subtracts poly2 from poly1.
-        /// The resulting polygons are sorted by area in descending order.
-        /// </summary>
-        public static List<SimplePolygon> Subtract(SimplePolygon poly1, SimplePolygon poly2)
-        {
-            List<SimplePolygon> result = new List<SimplePolygon>();
-            PathsD diffs = Clipper.Difference(poly1.Paths, poly2.Paths, FillRule.EvenOdd, 8);
-            foreach(var pathd in diffs)
-            {
-                pathd.Reverse();
-                result.Add(new SimplePolygon(pathd));
-            }
-            SortByAreaDescending(result);
-            return result;
-        }
-
+  
+    
         /// <summary>
         /// Inflates/deflates the polygon by the given amount. 
         /// Creates new polygon(s) so that their outline is parallel to original
@@ -296,66 +179,7 @@ namespace RikusGameDevToolbox.Geometry2d
         }
 
 
-        /// <summary>
-        /// Removes some of the common area polygon has with polygon B.
-        /// When applied to both polygons, the cease to overlap. 
-        /// </summary>
-        public SimplePolygon PartiallySubtract(SimplePolygon simplePolygon)
-        {
-            var intersections = OutlineIntersections(this, simplePolygon);
-            if (intersections.Count == 0) return MakeCopy();
-            
-            // If necessary, reorder the intersection _points so that the first intersection
-            // marks the start of the intersecting area.
-            if (!intersections[0].IsStartOfIntersectingArea)
-            {
-                intersections.Insert(0, intersections[^1]);
-                intersections.RemoveAt(intersections.Count - 1);
-            }
-
-            return CutBetweenIntersections(intersections[0], intersections[1], this);
-
-
-            SimplePolygon CutBetweenIntersections(OutlineIntersection i1, OutlineIntersection i2, SimplePolygon polygonToBeCut)
-            {
-                var result = polygonToBeCut.MakeCopy();
-
-                if (AreIntersectionInSameEdge()) return result;
-              
-                if (AreIntersectionInConsecutiveEdges())
-                {
-                    result._points.Insert(i1.PointIdx2, DirtyFix(i1.IntersectionPosition));
-                    result._points[i1.PointIdx2 + 1] = DirtyFix(i2.IntersectionPosition);
-                    return result;
-                }
-                
-                result._points[i1.PointIdx2] = DirtyFix(i1.IntersectionPosition);
-                result._points[i2.PointIdx1] = DirtyFix(i2.IntersectionPosition);
-                
-                if (i1.PointIdx2 < i2.PointIdx1 )
-                {
-                    int numPointsBetween = i2.PointIdx1 - i1.PointIdx2 - 1;
-                    if (numPointsBetween > 0) result._points.RemoveRange(i1.PointIdx2 + 1, numPointsBetween);
-                }
-                else
-                {
-                    result._points.RemoveRange(i1.PointIdx2, result._points.Count - i1.PointIdx2 - 1);
-                    result._points.RemoveRange(0, i2.PointIdx2-1);
-                }
-
-                return result;
-
-                bool AreIntersectionInSameEdge() => i1.PointIdx1 == i2.PointIdx1;
-                bool AreIntersectionInConsecutiveEdges() =>  i1.PointIdx2 == i2.PointIdx1;
-
-                Vector2 DirtyFix(Vector2 point)
-                {
-                    return point - (point-polygonToBeCut.AverageOfPoints())*0.01f;
-                }
-            
-            }
-        }
-
+      
         public Rect Bounds()
         {
             var bounds = new Rect();
@@ -478,7 +302,7 @@ namespace RikusGameDevToolbox.Geometry2d
             if (!Clipper.IsPositive(path)) throw new ArgumentException("Polygon's points must be given in counter-clockwise order.");
             Paths = new PathsD { path };
         }
-        
+           
 
 
         private static PointD ToPointD(Vector2 point) => new (point.x, point.y);
@@ -486,48 +310,6 @@ namespace RikusGameDevToolbox.Geometry2d
         private static PathD ToPathD(IEnumerable<Vector2> points) => new (points.Select(ToPointD));
         
 
-        private static List<OutlineIntersection> OutlineIntersections(SimplePolygon a, SimplePolygon b)
-        {
-            List<OutlineIntersection> intersections = new List<OutlineIntersection>();
-            
-            foreach ((int a1, int a2) in a.PointIndicesForEdges())
-            {
-                foreach ((int b1, int b2) in b.PointIndicesForEdges())
-                {
-                    var result = Math2d.LineSegmentIntersection(a._points[a1], a._points[a2], b._points[b1], b._points[b2]);
-                    if (result.AreIntersecting)
-                    {
-                        intersections.Add(new OutlineIntersection
-                        {
-                            IntersectionPosition = result.intersectionPoint,
-                            PointIdx1 = a1,
-                            PointIdx2 = a2,
-                            IsStartOfIntersectingArea = !Math2d.IsPointLeftOfLine(b._points[b1], a._points[a1], a._points[a2])
-                        });
-                    }
-                }
-            }
-            
-            if (intersections.Count % 2 == 1)
-            {
-                
-                Debug.LogError("Odd number of intersection. shared vertices: " + a.NumSharedVerticesWith(b));
-                
-                intersections.Clear();
-            }
-     
-            for(int i=1; i<intersections.Count; i++)
-            {
-                if (intersections[i].IsStartOfIntersectingArea == intersections[i - 1].IsStartOfIntersectingArea)
-                {
-                    Debug.LogError("OutlineIntersection _points are not alternating.");
-                    intersections.Clear();
-                    return intersections;
-                }
-            }
-            
-            return intersections;
-        }
 
         
         // Returns indices for the starts and ends of edges (0,1), (1,2), (2,3), ..., (n-1,0)

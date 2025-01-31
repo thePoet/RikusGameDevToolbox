@@ -67,7 +67,7 @@ namespace RikusGameDevToolbox.Geometry2d
             SimplePolygon ConvertToPolygon(VoronoiSite site)
             {
                 var vertices = site.Points.Select( p => p.AsVector2() );
-                return SimplePolygon.FromUnorderedPoints(vertices);
+                return PolygonTools.CreateFromUnorderedPoints(vertices);
             }
             
         }

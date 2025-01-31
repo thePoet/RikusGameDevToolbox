@@ -14,6 +14,8 @@ namespace RikusGameDevToolbox.Geometry2d
         ///Returns vertices of a hole in CW order
         public Vector2[] Hole(int index) => Paths[index+1].Select(p => new Vector2((float)p.x, (float)p.y)).ToArray();
         
+        public int NumHoles => Mathf.Max(0, Paths.Count - 1);
+        
         internal PolygonWithHoles(PathsD paths)
         {
             
@@ -25,11 +27,11 @@ namespace RikusGameDevToolbox.Geometry2d
                 throw new ArgumentException("PolygonWithHoles has " + numOutlines + " outlines and " + numHoles + " holes.");
             }
             
-            ArrangeContourFirst(paths);
+            ArrangePathsContourFirst(paths);
          }
         
         // Is this necessary or is contour always first?
-        void ArrangeContourFirst(PathsD paths)
+        void ArrangePathsContourFirst(PathsD paths)
         {
             int contourIndex = paths.FindIndex(Clipper.IsPositive);
             if (contourIndex != 0)

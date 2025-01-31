@@ -15,7 +15,7 @@ namespace RikusGameDevToolbox.Geometry2d
         
         /// Points in the outline of the polygon in CCW order.
         public Vector2[] Contour => Paths[0].Select(p => new Vector2((float)p.x, (float)p.y)).ToArray();
-        public int NumHoles => Mathf.Max(0, Paths.Count - 1);
+     
         
     }
 }
