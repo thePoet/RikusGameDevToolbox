@@ -1,9 +1,8 @@
 using System.Collections.Generic;
 using System.Linq;
 using Clipper2Lib;
-using PlasticPipe.PlasticProtocol.Messages;
-using RikusGameDevToolbox.GeneralUse;
 using UnityEngine;
+using static RikusGameDevToolbox.GeneralUse.RectExtensions;
 
 namespace RikusGameDevToolbox.Geometry2d
 {
@@ -31,9 +30,7 @@ namespace RikusGameDevToolbox.Geometry2d
  
         public Rect Bounds()
         {
-            var bounds = new Rect();
-            bounds.Bound(Contour);
-            return bounds;
+            return CreateRectToEncapsulate(Contour);
         }
         
         public IEnumerable<Edge> Edges()
