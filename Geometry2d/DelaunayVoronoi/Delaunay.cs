@@ -87,9 +87,7 @@ namespace RikusGameDevToolbox.Geometry2d.DelaunayVoronoi
         
         private Rect Bounds(IEnumerable<Point> points)
         {
-            Rect bounds = new Rect();
-            bounds.Bound(points.Select(p => p.AsVector2));
-            return bounds;
+            return RectExtensions.CreateRectToEncapsulate(points.Select(p => p.AsVector2));
         }
 
         private ISet<Triangle> FindBadTriangles(Point point, HashSet<Triangle> triangles)

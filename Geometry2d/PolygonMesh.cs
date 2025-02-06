@@ -6,37 +6,37 @@ namespace RikusGameDevToolbox.Geometry2d
 {
     public class PolygonMesh
     {
-        public List<Polygon> Polygons { get; } = new();
-        private Dictionary<Polygon, List<Polygon>> _neighbours = new();
+        public List<SimplePolygon> Polygons { get; } = new();
+        private Dictionary<SimplePolygon, List<SimplePolygon>> _neighbours = new();
         
-        public List<Polygon> NeighboursOf(Polygon polygon)
+        public List<SimplePolygon> NeighboursOf(SimplePolygon simplePolygon)
         {
-            return _neighbours[polygon];
+            return _neighbours[simplePolygon];
         }
  
-        public void AddPolygon(Polygon polygon)
+        public void AddPolygon(SimplePolygon simplePolygon)
         {
-            Polygons.Add(polygon);
-            _neighbours[polygon] = new List<Polygon>();
+            Polygons.Add(simplePolygon);
+            _neighbours[simplePolygon] = new List<SimplePolygon>();
         }
         
-        public void RemovePolygon(Polygon polygon)
+        public void RemovePolygon(SimplePolygon simplePolygon)
         {
-            while (NeighboursOf(polygon).Count > 0)
+            while (NeighboursOf(simplePolygon).Count > 0)
             {
-                MarkAsNotNeighbours(polygon, NeighboursOf(polygon)[0]);
+                MarkAsNotNeighbours(simplePolygon, NeighboursOf(simplePolygon)[0]);
             }
-            _neighbours.Remove(polygon);
-            Polygons.Remove(polygon);
+            _neighbours.Remove(simplePolygon);
+            Polygons.Remove(simplePolygon);
         }
         
-        public void MarkAsNeighbours(Polygon polygon1, Polygon polygon2)
+        public void MarkAsNeighbours(SimplePolygon polygon1, SimplePolygon polygon2)
         {
             _neighbours[polygon1].Add(polygon2);
             _neighbours[polygon2].Add(polygon1);
         }
         
-        public void MarkAsNotNeighbours(Polygon polygon1, Polygon polygon2)
+        public void MarkAsNotNeighbours(SimplePolygon polygon1, SimplePolygon polygon2)
         {
             _neighbours[polygon1].Remove(polygon2);
             _neighbours[polygon2].Remove(polygon1);

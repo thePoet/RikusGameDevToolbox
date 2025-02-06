@@ -34,7 +34,7 @@ namespace RikusGameDevToolbox.Geometry2d
         /// </summary>
         private static PolygonMesh PolygonMeshFromEdges(List<VoronoiEdge> edges)
         {
-            Dictionary<VoronoiSite, Polygon> polygons = new();
+            Dictionary<VoronoiSite, SimplePolygon> polygons = new();
             List<(VoronoiSite, VoronoiSite)> neighbours = new();
             
             foreach (var edge in edges)
@@ -46,7 +46,7 @@ namespace RikusGameDevToolbox.Geometry2d
             }
 
             var mesh = new PolygonMesh();
-            foreach (Polygon polygon in polygons.Values)
+            foreach (SimplePolygon polygon in polygons.Values)
             {
                 mesh.AddPolygon(polygon);
             }
@@ -64,10 +64,10 @@ namespace RikusGameDevToolbox.Geometry2d
                 polygons.Add(site, ConvertToPolygon(site));
             }
 
-            Polygon ConvertToPolygon(VoronoiSite site)
+            SimplePolygon ConvertToPolygon(VoronoiSite site)
             {
                 var vertices = site.Points.Select( p => p.AsVector2() );
-                return Polygon.FromUnorderedPoints(vertices);
+                return PolygonTools.CreateFromUnorderedPoints(vertices);
             }
             
         }

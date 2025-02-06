@@ -1,11 +1,11 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using RikusGameDevToolbox.Geometry2d;
+using RikusGameDevToolbox.GeneralUse;
 using UnityEngine;
 using Random = UnityEngine.Random;
 
-namespace RikusGameDevToolbox.GeneralUse
+namespace RikusGameDevToolbox.Geometry2d
 {
     public static class DistributeObjects
     {
