@@ -1,4 +1,5 @@
 
+using System.Collections.Generic;
 using UnityEngine;
 
 namespace RikusGameDevToolbox.GeneralUse
@@ -54,6 +55,31 @@ namespace RikusGameDevToolbox.GeneralUse
             return Mathf.DeltaAngle(angleFrom, angleTo);
         }
 
+        /// <summary>
+        /// Circular mean is the average of then angles that takes into account the circular nature of angles i.e.
+        /// the average of 350 and 10 degrees is 0 degrees not 180 degrees. The result is always in range 0..360f.
+        /// </summary>
+        /// <param name="angles">Angles in degrees</param>
+        /// <returns></returns>
+        public static float CircularMean(IEnumerable<float> angles)
+        {
+            float sumSines = 0;
+            float sumCosines = 0;
+            int count = 0;
+            foreach (float angle in angles)
+            {
+                sumSines += Mathf.Sin(angle * Mathf.Deg2Rad);
+                sumCosines += Mathf.Cos(angle * Mathf.Deg2Rad);
+                count++;
+            }
+
+            sumSines /= count;
+            sumCosines /= count;
+
+            return Normalize(Mathf.Atan2(sumSines, sumCosines) * Mathf.Rad2Deg);
+        }
+        
+        
         // TODO: Move relevat stuff from Math2d to here
     }
 }
