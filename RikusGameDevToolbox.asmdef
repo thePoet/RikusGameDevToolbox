@@ -1,3 +1,17 @@
 {
-	"name": "RikusGameDevToolbox"
+    "name": "RikusGameDevToolbox",
+    "rootNamespace": "",
+    "references": [
+        "GUID:44924221d30db4602a2f54625c5d84ed",
+        "GUID:9267cde3c47644be2aa278c43d7895c3"
+    ],
+    "includePlatforms": [],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "autoReferenced": true,
+    "defineConstraints": [],
+    "versionDefines": [],
+    "noEngineReferences": false
 }

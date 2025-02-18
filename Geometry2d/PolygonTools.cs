@@ -28,8 +28,8 @@ namespace RikusGameDevToolbox.Geometry2d
             var points = new Vector2[numSides];
             for (int i = 0; i < numSides; i++)
             {
-                points[i] = new Vector2(radius * Mathf.Cos(2 * Mathf.PI * i / numSides), 
-                    radius * Mathf.Sin(2 * Mathf.PI * i / numSides)) * radius;
+                points[i] = new Vector2(Mathf.Cos(2 * Mathf.PI * i / numSides), 
+                    Mathf.Sin(2 * Mathf.PI * i / numSides)) * radius;
             }
             return new SimplePolygon(points);
         }

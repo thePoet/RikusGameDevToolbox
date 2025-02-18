@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using Clipper2Lib;
@@ -41,6 +42,11 @@ namespace RikusGameDevToolbox.Geometry2d
             }
         }
         
+        public void Simplify(float tolerance)
+        {
+            Paths = Clipper.SimplifyPaths(Paths, tolerance);
+        }
+        
         /// <summary>
         /// Circumference of the contour.
         /// </summary>
@@ -73,6 +79,13 @@ namespace RikusGameDevToolbox.Geometry2d
                 list.Sort((a, b) => b.Area.CompareTo(a.Area));
             }
 
+        }
+        
+        public override string ToString()
+        {
+            return $"Polygon with {Paths.Count} paths. \n{string.Join("\n", Paths.Select(PathAsString))}\n";
+            
+            String PathAsString(PathD path) => string.Join(", ", path.Select(p => $"({p.x}, {p.y})"));
         }
 
         private PointInPolygonResult PointInPolygon(Vector2 point)

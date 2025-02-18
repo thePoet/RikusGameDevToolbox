@@ -208,15 +208,6 @@ namespace RikusGameDevToolbox.Geometry2d
             return sameNumberOfPoints && samePoints;
         }
         
-        public override string ToString()
-        {
-            string result = "Polygon with " + _points.Count + "  points: ";
-            foreach (var point in _points)
-            {
-                result += point + " ";
-            }
-            return result;
-        }
 
         public void DrawWithGizmos()
         {
