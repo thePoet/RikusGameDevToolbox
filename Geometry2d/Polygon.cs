@@ -87,6 +87,19 @@ namespace RikusGameDevToolbox.Geometry2d
             
             String PathAsString(PathD path) => string.Join(", ", path.Select(p => $"({p.x}, {p.y})"));
         }
+        
+        public void DrawWithGizmos()
+        {
+            Gizmos.color = Color.green;
+
+            for (int pathIndex=0; pathIndex < Paths.Count; pathIndex++)
+            {
+                foreach ((int a, int b) in PointIndicesForEdges(pathIndex))
+                {
+                    Gizmos.DrawLine(ToVector2(Paths[0][a]), ToVector2(Paths[0][b]));
+                }
+            }
+        }
 
         private PointInPolygonResult PointInPolygon(Vector2 point)
         {
@@ -107,11 +120,11 @@ namespace RikusGameDevToolbox.Geometry2d
              
         // Returns indices for the starts and ends of edges (0,1), (1,2), (2,3), ..., (n-1,0)
         // where n is the number of edges in the polygon.
-        private IEnumerable<(int, int)> PointIndicesForEdges()
+        private IEnumerable<(int, int)> PointIndicesForEdges(int pathIndex = 0)
         {
-            for (int i = 0; i < Paths[0].Count; i++)
+            for (int i = 0; i < Paths[pathIndex].Count; i++)
             {
-                yield return i == Paths[0].Count - 1 ? (i, 0) : (i, i + 1);
+                yield return i == Paths[pathIndex].Count - 1 ? (i, 0) : (i, i + 1);
             }
         }
 

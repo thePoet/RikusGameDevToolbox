@@ -209,14 +209,7 @@ namespace RikusGameDevToolbox.Geometry2d
         }
         
 
-        public void DrawWithGizmos()
-        {
-            Gizmos.color = Color.green;
-            foreach (var edge in Edges())
-            {
-                Gizmos.DrawLine(edge.Point1, edge.Point2);
-            }
-        }
+    
         
         #endregion
         

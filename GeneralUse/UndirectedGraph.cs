@@ -1,7 +1,8 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using UnityEngine;
+using System.Net;
+
 
 namespace RikusGameDevToolbox.GeneralUse
 {
@@ -190,6 +191,39 @@ namespace RikusGameDevToolbox.GeneralUse
                 }
                 return graph;
             }
+        }
+        
+        /// <summary>
+        /// Returns a new graph with the same links but with the nodes transformed to a new type.
+        /// </summary>
+        /// <param name="nodeTransformer"></param>
+        /// <typeparam name="TNew">New type for nodes</typeparam>
+        /// <returns>The new UndirectedGraph</returns>
+        public UndirectedGraph<TNew> ConvertNodes<TNew>(Func<T,TNew> nodeTransformer) where TNew : IEquatable<TNew>
+        {
+            var newGraph = new UndirectedGraph<TNew>();
+
+            Dictionary<T, TNew> lookup = new Dictionary<T, TNew>();
+                
+            foreach (var node in Nodes)
+            {
+                var newNode = nodeTransformer(node);
+                newGraph.AddNode(newNode);
+                lookup.Add(node, newNode);
+            }
+
+            foreach (var node in Nodes)
+            {
+                TNew a = lookup[node];
+                foreach (var linkedNode in Links(node))
+                {
+                    TNew b = lookup[linkedNode]; 
+                    if (newGraph.AreLinked(a,b)) continue;
+                    newGraph.AddLink(a,b);
+                }
+            }
+
+            return newGraph;
         }
 
         #endregion
