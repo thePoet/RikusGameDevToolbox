@@ -54,16 +54,19 @@ namespace RikusGameDevToolbox.Geometry2d
         {
             return Edges().Sum(edge => edge.Length);
         }
-        
+
         /// <summary>
         /// Inflates/deflates the polygon outline/holes by the given amount. 
         /// The resulting list of polygons are sorted by area in descending order.
         /// </summary>
         /// <param name="amount">Distance between old and new outline, positive to grow contour and shrink holes.</param>
+        /// <param name="roundedCorners">See: https://www.angusj.com/clipper2/Docs/Units/Clipper/Types/JoinType.htm</param>
         /// <returns>List of resulting polygons descending from the largest by area.</returns>
-        public List<Polygon> Inflated(float amount)
+        public List<Polygon> Inflated(float amount, bool roundedCorners = false)
         {
-            var paths = Clipper.InflatePaths(Paths, amount, JoinType.Miter, EndType.Polygon);
+            JoinType joinType = JoinType.Miter;
+            if (roundedCorners) joinType = JoinType.Round;
+            PathsD paths= Clipper.InflatePaths(Paths, amount, joinType, EndType.Polygon);
           
             PolyTreeD polytree = new();
             ClipperD clipper = new();
