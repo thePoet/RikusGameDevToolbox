@@ -74,7 +74,7 @@ namespace RikusGameDevToolbox.Geometry2d
         /// <summary>
         /// Return true if all the points of this polygon are inside or on the edge of the other polygon. 
         /// </summary>
-        public bool IsInsideOf(SimplePolygon other)
+        public bool IsInsideOf(Polygon other)
         {
             return _points.All(p=> other.IsPointInside(p) || other.IsPointOnEdge(p));
         }
