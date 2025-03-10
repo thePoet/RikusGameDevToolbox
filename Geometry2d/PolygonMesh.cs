@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using UnityEngine;
 
 namespace RikusGameDevToolbox.Geometry2d
@@ -41,6 +42,29 @@ namespace RikusGameDevToolbox.Geometry2d
             _neighbours[polygon1].Remove(polygon2);
             _neighbours[polygon2].Remove(polygon1);
         }
+        
+        public bool IsPolygonOnEdge(SimplePolygon polyogn)
+        {
+            return NeighboursOf(polyogn).Count < polyogn.Edges().Count();
+        }
+        
+        /// <summary>
+        /// List of polygons that are on the edges of the mesh i.e. they have edges with no neighbour
+        /// on the other side.
+        /// </summary>
+        public List<SimplePolygon> PolygonsOnEdges()
+        {
+            List<SimplePolygon> result = new();
+            foreach (var polygon in Polygons)
+            {
+                if (IsPolygonOnEdge(polygon))
+                {
+                    result.Add(polygon);
+                }
+            }
+            return result;
+        }
+        
         
         /// <summary>
         /// Call this in OnDrawGizmos() to visualize the mesh for debugging purposes.

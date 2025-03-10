@@ -54,6 +54,12 @@ namespace RikusGameDevToolbox.Geometry2d
         {
             return Edges().Sum(edge => edge.Length);
         }
+        
+        
+        public SimplePolygon DiscardHoles()
+        {
+            return new SimplePolygon(Paths[0]);
+        }
 
         /// <summary>
         /// Inflates/deflates the polygon outline/holes by the given amount. 
