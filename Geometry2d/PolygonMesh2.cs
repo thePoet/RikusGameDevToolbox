@@ -109,8 +109,9 @@ namespace RikusGameDevToolbox.Geometry2d
             // pitäis tutkia etteivät polygonin pisteet ovat epsilonia lähemäpä toisiaan
 
             
-            // Jos tulee virhe niin kaikki pitäisi hoitaa ennalleen 
+         
             
+            List<Point> newPoints = new();
             
             foreach (Vector2 vertexPos in simplePolygon.Contour)
             {
@@ -119,18 +120,25 @@ namespace RikusGameDevToolbox.Geometry2d
                 {
                     p = new Point(vertexPos);
                     _points.Add(p); 
+                    newPoints.Add(p);
                 }
-               polysPoints.Add(p);
+               polysPoints.Add(p);  
             }
 
-            // old polys points into new poly
-            InsertExistingPointsOnEdges(polysPoints);
-
-    
-            // the other way around
-            InsertNewPointsOnEdgesOfOldPolys(polysPoints);
-
         
+            InsertExistingPointsOnEdgesOfNewPoly(polysPoints);
+            InsertNewPointsOnEdgesOfOldPolys(polysPoints); // In case of excception, the points added here won't be removed since they don't have visible effect
+
+            // Check that edges have room for the new polygon
+            foreach (var (point1, point2) in AsLoopingPairs(polysPoints))
+            {
+                Edge edge = point1.EdgeConnectingTo(point2);
+                if (edge != null && edge.NumberOfPolys == 2)
+                {
+                    newPoints.ForEach(newPoint => _points.Remove(newPoint)); // Reset to previous state
+                    throw new InvalidOperationException("Edge already has polygons on both sides.");
+                }
+            }
 
             Poly poly = new();
 
@@ -171,7 +179,7 @@ namespace RikusGameDevToolbox.Geometry2d
             
             // Given the list of point in a new polygon, this finds points of old polygons that split the
             // edges of the new polygon and insert them into the list.
-            void InsertExistingPointsOnEdges(List<Point> polyPoints)
+            void InsertExistingPointsOnEdgesOfNewPoly(List<Point> polyPoints)
             {
                 for (int i=0; i<polyPoints.Count; i++)
                 {
