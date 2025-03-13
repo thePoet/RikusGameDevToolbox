@@ -129,6 +129,12 @@ namespace RikusGameDevToolbox.GeneralUse
             return (linePointB.x - linePointA.x) * (point.y - linePointA.y) -
                 (linePointB.y - linePointA.y) * (point.x - linePointA.x) > 0;
         }
+        
+        public static bool IsPointOnLineSegment(Vector2 point, Vector2 linePointA, Vector2 linePointB, bool epsilon)
+        {
+            return Mathf.Approximately(Vector2.Distance(point, linePointA) + Vector2.Distance(point, linePointB),
+                Vector2.Distance(linePointA, linePointB));
+        }
 
 
         // FROM: https://gist.github.com/sinbad/68cb88e980eeaed0505210d052573724

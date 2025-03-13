@@ -17,34 +17,6 @@ namespace RikusGameDevToolbox.Geometry2d
         private const float Epsilon = 0.01f;
 
         #region ------------------------------------------ PUBLIC METHODS -----------------------------------------------
-        
-        /// <summary>
-        /// Inflates/deflates the polygon by the given amount. 
-        /// Creates new polygon(s) so that their outline is parallel to original
-        /// The resulting list of polygons are sorted by area in descending order.
-        /// </summary>
-        /// <param name="simplePolygon"></param>
-        /// <param name="amount">Distance between old and new outline.</param>
-        /// <returns>List of resulting polygons descending from the largest by area.</returns>
-       /*
-        public static List<SimplePolygon> Inflate(SimplePolygon simplePolygon, float amount)
-        {
-            var paths = Clipper.InflatePaths(simplePolygon.Paths, amount, JoinType.Miter, EndType.Polygon);
-            List<SimplePolygon> result = new List<SimplePolygon>();
-            foreach(var pathd in paths)
-            {
-                result.Add(new SimplePolygon(pathd));
-            }
-            SortByAreaDescending(result);
-            return result;
-            
-            
-            void SortByAreaDescending(List<SimplePolygon> list)
-            {
-                list.Sort((a, b) => b.Area.CompareTo(a.Area));
-            }
-
-        }*/
 
         /// <summary>
         /// Constructor for a polygon with the given points. 
