@@ -5,6 +5,7 @@ using RikusGameDevToolbox.GeneralUse;
 using UnityEngine;
 
 
+
 namespace RikusGameDevToolbox.Geometry2d
 {
     public class PolygonMesh2
@@ -77,9 +78,10 @@ namespace RikusGameDevToolbox.Geometry2d
         
         
         
-        private float _epsilon;
+        private readonly float _epsilon;
         private bool _outlinesAreUpToDate = true;
-        private readonly List<Point> _points = new();
+        private float _longestEdgeLength = 0f;
+        private readonly SpatialCollection2d<Point> _points = new();
         private readonly List<Edge> _edges = new();
         private readonly Dictionary<Guid, Poly> _polys = new();
 
@@ -95,7 +97,9 @@ namespace RikusGameDevToolbox.Geometry2d
 
         public List<(Vector2, Vector2)> Edges() => _edges.Select(e => (e.Point1.Position, e.Point2.Position)).ToList();
 
-        public List<Vector2> Points() => _points.Select(p => p.Position).ToList();
+        public List<Vector2> Points() => _points.ToList()
+                                                .Select(p => p.Position)
+                                                .ToList();
 
         public List<SimplePolygon> PolygonShapes() => _polys.Values.Select(p => p.AsSimplePolygon()).ToList();
 
@@ -119,7 +123,7 @@ namespace RikusGameDevToolbox.Geometry2d
                 if (p == null)
                 {
                     p = new Point(vertexPos);
-                    _points.Add(p); 
+                    _points.Insert(vertexPos, p);
                     newPoints.Add(p);
                 }
                polysPoints.Add(p);  
@@ -135,7 +139,7 @@ namespace RikusGameDevToolbox.Geometry2d
                 Edge edge = point1.EdgeConnectingTo(point2);
                 if (edge != null && edge.NumberOfPolys == 2)
                 {
-                    newPoints.ForEach(newPoint => _points.Remove(newPoint)); // Reset to previous state
+                    newPoints.ForEach(newPoint => _points.Remove(newPoint.Position, newPoint)); // Reset to previous state
                     throw new InvalidOperationException("Edge already has polygons on both sides.");
                 }
             }
@@ -174,6 +178,11 @@ namespace RikusGameDevToolbox.Geometry2d
                 };
                 point1.Edges.Add(edge);
                 point2.Edges.Add(edge);
+                float length = Vector2.Distance(point1.Position, point2.Position);
+                if (length > _longestEdgeLength)
+                {
+                    _longestEdgeLength = length;
+                }
                 return edge;
             }
             
@@ -185,7 +194,7 @@ namespace RikusGameDevToolbox.Geometry2d
                 {
                     Point point1 = polyPoints[i];
                     Point point2 = polyPoints[(i+1) % polyPoints.Count];
-                    List<Point> pointsOnEdge = GetPointsOnEdge(point1, point2);
+                    List<Point> pointsOnEdge = ExistingPointsOnEdge(point1, point2);
                     if (pointsOnEdge.Any())
                     {
                         Point closestMiddlePoint = pointsOnEdge
@@ -203,8 +212,6 @@ namespace RikusGameDevToolbox.Geometry2d
             // their edges
             void InsertNewPointsOnEdgesOfOldPolys(List<Point> points)
             {
-               
-                
                 foreach (var point in points.Where(p=> !p.Edges.Any())) // Points that have edges are not new
                 {
                     var edges = GetEdgesThroughPoint(point);
@@ -215,7 +222,6 @@ namespace RikusGameDevToolbox.Geometry2d
             void InsertPointOnEdge(Point point, Edge edge)
             {
                 _edges.Remove(edge);
-                
                 
                 Edge edge1 = CreateNewEdge(edge.Point1, point);
                 Edge edge2 = CreateNewEdge(point, edge.Point2);
@@ -283,11 +289,11 @@ namespace RikusGameDevToolbox.Geometry2d
                  edge.Point2.Edges.Remove(edge);
                  if (edge.Point1.Edges.Count == 0)
                  {
-                     _points.Remove(edge.Point1);
+                     _points.Remove(edge.Point1.Position, edge.Point1);
                  }
                  if (edge.Point2.Edges.Count == 0)
                  {
-                     _points.Remove(edge.Point2);
+                     _points.Remove(edge.Point2.Position, edge.Point2);
                  }
              }
 
@@ -323,13 +329,7 @@ namespace RikusGameDevToolbox.Geometry2d
             { 
                 Gizmos.DrawLine(edge.Point1.Position, edge.Point2.Position);
             }
-            
-            //Gizmos.color = Color.blue;
-            //foreach (var neighbour in NeighboursOf(polygon))
-            //{
-             //   Gizmos.DrawLine(polygon.Centroid(), polygon.Centroid() + (neighbour.Centroid() - polygon.Centroid()).normalized );
-            //}
-
+        
         }
 
         #endregion
@@ -339,8 +339,8 @@ namespace RikusGameDevToolbox.Geometry2d
         /// <summary> Return an existing point in given position or null if one does not exist.</summary>
         private Point ExistingPointAt(Vector2 position)
         {
-            // TODO: Horribly inefficient
-            return _points.FirstOrDefault(point => IsSamePosition(position, point.Position));
+            var area = RectCenteredAt(position, size: _epsilon);
+            return _points.ItemsIn(area).FirstOrDefault();
         }
 
 
@@ -354,26 +354,50 @@ namespace RikusGameDevToolbox.Geometry2d
             }
         }
 
-        private List<Point> GetPointsOnEdge(Point edgePoint1, Point edgePoint2)
+        private List<Point> ExistingPointsOnEdge(Point edgePoint1, Point edgePoint2)
         {
-            List<Point> points = new();
-            foreach (Point point in _points) // Inefficient !!!!!!!!!!!!!!!!1
+            List<Point> result = new();
+            Rect area = RectSurrounding(edgePoint1.Position, edgePoint2.Position); 
+            var pointsInArea = _points.ItemsIn(area);
+                 
+            foreach (Point point in pointsInArea) 
             {
                 if (point == edgePoint1 || point == edgePoint2) continue;
                 if (IsPointOnEdge(point.Position, edgePoint1.Position, edgePoint2.Position))
                 {
-                    points.Add(point);
+                    result.Add(point);
                 }
             }
 
-            return points;
+            return result;
+            
+            Rect RectSurrounding(Vector2 a, Vector2 b)
+            {
+                float m = _epsilon * 2f; // Margin to catch points that are on the edge
+                return Rect.MinMaxRect( xmin: Mathf.Min(a.x, b.x)-m, ymin: Mathf.Min(a.y, b.y)-m,
+                                        xmax: Mathf.Max(a.x, b.x)+m, ymax: Mathf.Max(a.y, b.y)+m );
+            }
         }
         
+        /// <summary>
+        /// Returns list of edges that go through the given point but do not have the point as either endpoint.
+        /// </summary>
         private List<Edge> GetEdgesThroughPoint(Point point)
         {
-            // Inefficient !!!!!!!!!!!!!!!!1
-            
-            return _edges.Where(edge => !edge.HasPoint(point) && IsPointOnEdge(point.Position, edge.Point1.Position, edge.Point2.Position)).ToList();
+            Rect area = RectCenteredAt(point.Position, size: _longestEdgeLength + _epsilon*10f);
+            var pointsInArea = _points.ItemsIn(area);
+
+            List<Edge> result = new();
+            foreach (var p in pointsInArea)
+            {
+                foreach (var edge in p.Edges)
+                {
+                    if (edge.HasPoint(point)) continue;
+                    if (!IsPointOnEdge(point.Position, edge.Point1.Position, edge.Point2.Position)) continue;
+                    if (!result.Contains(edge)) result.Add(edge);
+                }
+            }
+            return result;
         }
 
         private bool IsPointOnEdge(Vector2 point, Vector2 edgeStart, Vector2 edgeEnd)
@@ -394,10 +418,11 @@ namespace RikusGameDevToolbox.Geometry2d
             }
         }
         
-        public bool IsSamePosition(Vector2 position1, Vector2 position2)
+      
+        private Rect RectCenteredAt(Vector2 center, float size)
         {
-            return Mathf.Abs(position1.x - position2.x) <= _epsilon &&
-                   Mathf.Abs(position1.y - position2.y) <= _epsilon;
+            return Rect.MinMaxRect(center.x - size * 0.5f, center.y - size * 0.5f,
+                                   center.x + size * 0.5f, center.y + size * 0.5f);
         }
 
         #endregion
