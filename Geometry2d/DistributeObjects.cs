@@ -50,6 +50,7 @@ namespace RikusGameDevToolbox.Geometry2d
         public static List<Vector2> InPolygon(Polygon polygon, float minSpacing, IEnumerable<Vector2> existingPoints = null)
         {
             // TODO: the random function is not very good if polygon is small compared to it's bounding box
+            // TODO: Also it is weirdly slow
             Vector2 RandomPoint() => polygon.Bounds().RandomPointInside();
             bool IsInside(Vector2 position) => polygon.IsPointInside(position);
             return Poisson(RandomPoint, minSpacing, IsInside, existingPoints);

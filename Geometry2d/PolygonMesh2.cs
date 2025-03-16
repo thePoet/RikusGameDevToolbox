@@ -123,7 +123,7 @@ namespace RikusGameDevToolbox.Geometry2d
                 if (p == null)
                 {
                     p = new Point(vertexPos);
-                    _points.Insert(vertexPos, p);
+                    _points.Add(vertexPos, p);
                     newPoints.Add(p);
                 }
                polysPoints.Add(p);  
@@ -340,7 +340,7 @@ namespace RikusGameDevToolbox.Geometry2d
         private Point ExistingPointAt(Vector2 position)
         {
             var area = RectCenteredAt(position, size: _epsilon);
-            return _points.ItemsIn(area).FirstOrDefault();
+            return _points.ItemsInRectangle(area).FirstOrDefault();
         }
 
 
@@ -358,7 +358,7 @@ namespace RikusGameDevToolbox.Geometry2d
         {
             List<Point> result = new();
             Rect area = RectSurrounding(edgePoint1.Position, edgePoint2.Position); 
-            var pointsInArea = _points.ItemsIn(area);
+            var pointsInArea = _points.ItemsInRectangle(area);
                  
             foreach (Point point in pointsInArea) 
             {
@@ -385,7 +385,7 @@ namespace RikusGameDevToolbox.Geometry2d
         private List<Edge> GetEdgesThroughPoint(Point point)
         {
             Rect area = RectCenteredAt(point.Position, size: _longestEdgeLength + _epsilon*10f);
-            var pointsInArea = _points.ItemsIn(area);
+            var pointsInArea = _points.ItemsInRectangle(area);
 
             List<Edge> result = new();
             foreach (var p in pointsInArea)

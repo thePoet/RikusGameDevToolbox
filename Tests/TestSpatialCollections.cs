@@ -28,7 +28,21 @@ public class TestSpatialCollections
         var sc = CollectionWithItems(items);
         var searchArea = new Rect(0, 0, 50, 50);
         var expected = items.Where(item => searchArea.Contains(item.Position)).ToList();
-        var actual = sc.ItemsIn(searchArea);
+        var actual = sc.ItemsInRectangle(searchArea);
+        Assert.IsTrue(actual.Count > 0);
+        Assert.IsTrue(SameContents(expected, actual));
+    }
+    
+    [Test]
+    public void ItemsInCircle()
+    {
+        var items = CreateTestItems();
+        var sc = CollectionWithItems(items);
+      
+        Vector2 center = new Vector2(15, -20);
+        float radius = 30;
+        var expected = items.Where(item => Vector2.Distance(item.Position, center) <= radius).ToList();
+        var actual = sc.ItemsInCircle(center, radius);
         Assert.IsTrue(actual.Count > 0);
         Assert.IsTrue(SameContents(expected, actual));
     }
@@ -57,7 +71,7 @@ public class TestSpatialCollections
         
         var searchArea = new Rect(0, 0, 30, 30);
         var expectedDeleted = items.Where(item => searchArea.Contains(item.Position)).ToList();
-        var toBeDeleted = sc.ItemsIn(searchArea);
+        var toBeDeleted = sc.ItemsInRectangle(searchArea);
 
         Assert.IsTrue(SameContents(expectedDeleted, toBeDeleted));
         Assert.IsTrue(toBeDeleted.Count > 0);
@@ -70,6 +84,42 @@ public class TestSpatialCollections
         Assert.IsTrue(DifferentContents(sc.ToList(), toBeDeleted));
     }
     
+    [Test]
+    public void AddDeleteCyclesItems()
+    {
+     
+        var sc = new SpatialCollection2d<Item>();
+        List<Item> items = new List<Item>();
+
+        for (int cycle = 0; cycle < 10; cycle++)
+        {
+            for (int i = 0; i < 100; i++)
+            {
+                Item item = new Item
+                {
+                    Id = i,
+                    Position = new Vector2(Random.Range(-50f, 50f), Random.Range(-50f, 50f))
+                };
+                sc.Add(item.Position, item);
+                items.Add(item);
+            }
+
+            var searchArea = new Rect(0, 0, 30, 30);
+            var expectedDeleted = items.Where(item => searchArea.Contains(item.Position)).ToList();
+            var toBeDeleted = sc.ItemsInRectangle(searchArea);
+
+            Assert.IsTrue(SameContents(expectedDeleted, toBeDeleted));
+            Assert.IsTrue(toBeDeleted.Count > 0);
+
+            foreach (var item in toBeDeleted)
+            {
+                sc.Remove(item.Position, item);
+                items.RemoveAll(i => i == item);
+            }
+
+            Assert.IsTrue(SameContents(sc.ToList(), items));
+        }
+    }
     
     
     private SpatialCollection2d<Item> CollectionWithItems(List<Item> items)
@@ -77,7 +127,7 @@ public class TestSpatialCollections
         var sc = new SpatialCollection2d<Item>();
         foreach (var item in items)
         {
-            sc.Insert(item.Position, item);
+            sc.Add(item.Position, item);
         }
         return sc;
     }
