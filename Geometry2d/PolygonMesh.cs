@@ -73,7 +73,7 @@ namespace RikusGameDevToolbox.Geometry2d
         {
             foreach (var polygon in Polygons)
             {
-                Gizmos.DrawSphere(polygon.Centroid(),0.3f);
+                //Gizmos.DrawSphere(polygon.Centroid(),0.3f);
                 Gizmos.color = Color.yellow;
                 foreach (var edge in polygon.Edges())
                 {
@@ -83,7 +83,7 @@ namespace RikusGameDevToolbox.Geometry2d
                 Gizmos.color = Color.blue;
                 foreach (var neighbour in NeighboursOf(polygon))
                 {
-                    Gizmos.DrawLine(polygon.Centroid(), polygon.Centroid() + (neighbour.Centroid() - polygon.Centroid()).normalized );
+                    Gizmos.DrawLine(polygon.Centroid(), neighbour.Centroid() );
                 }
             }
         }

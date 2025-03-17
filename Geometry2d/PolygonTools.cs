@@ -189,7 +189,7 @@ namespace RikusGameDevToolbox.Geometry2d
             if (intersections.Count % 2 == 1)
             {
                 
-                Debug.LogError("Odd number of intersection. shared vertices: " + a.NumSharedVerticesWith(b));
+                Debug.LogError("Odd number of intersection.");
                 
                 intersections.Clear();
             }

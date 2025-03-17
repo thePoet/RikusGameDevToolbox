@@ -105,16 +105,75 @@ namespace RikusGameDevToolbox.Geometry2d
 
         public List<Guid> PolygonIds() => _polys.Keys.ToList();
 
+        public List<(Guid, SimplePolygon)> Polygons() => _polys.Select(kvp => (kvp.Key, kvp.Value.AsSimplePolygon())).ToList();
 
-        public Guid AddPolygon(SimplePolygon simplePolygon)
+
+        public Guid AddPolygon(SimplePolygon shape)
+        {
+            Poly poly = CreatePolygon(shape);
+            poly.Id = Guid.NewGuid();
+            _polys.Add(poly.Id, poly);
+            _outlinesAreUpToDate = false;
+            return poly.Id;
+        }
+        
+        public void ChangeShapeOfPolygon(Guid id, SimplePolygon newShape)
+        {
+            RemoveGeometry(id);
+            _polys[id] = CreatePolygon(newShape);
+        }
+
+       
+
+        public void RemovePolygon(Guid id)
+        {
+            RemoveGeometry(id);
+            _polys.Remove(id);
+            _outlinesAreUpToDate = false; 
+        }
+        
+        public bool PolygonAt(Vector2 position, out Guid id)
+        {
+            throw new NotImplementedException();
+        }
+        
+        public int NumberOfSeparateMeshes()
+        {
+            throw new NotImplementedException();
+        }
+
+        public Polygon ShapeAsPolygon()
+        {
+            throw new NotImplementedException();
+        }
+
+
+        /// <summary>
+        /// Call this in OnDrawGizmos() to visualize the mesh for debugging purposes.
+        /// </summary>
+        public void DrawWithGizmos()
+        {
+            foreach (var edge in _edges)
+            { 
+                if (edge.Poly1 == null || edge.Poly2 == null)
+                {
+                    Gizmos.color = Color.yellow;
+                }
+                else
+                {
+                    Gizmos.color = Color.blue;
+                }
+                Gizmos.DrawLine(edge.Point1.Position, edge.Point2.Position);
+            }
+        }
+
+        #endregion
+
+        #region ------------------------------------------ PRIVATE METHODS ----------------------------------------------
+
+        private Poly CreatePolygon(SimplePolygon simplePolygon)
         {
             List<Point> polysPoints = new();
-
-            // pitäis tutkia etteivät polygonin pisteet ovat epsilonia lähemäpä toisiaan
-
-            
-         
-            
             List<Point> newPoints = new();
             
             foreach (Vector2 vertexPos in simplePolygon.Contour)
@@ -126,10 +185,11 @@ namespace RikusGameDevToolbox.Geometry2d
                     _points.Add(vertexPos, p);
                     newPoints.Add(p);
                 }
-               polysPoints.Add(p);  
+                polysPoints.Add(p);  
             }
-
-        
+            
+            polysPoints =  polysPoints.Distinct().ToList(); // Removes dublicate points (happens when edges are shorter than epsilon)
+            
             InsertExistingPointsOnEdgesOfNewPoly(polysPoints);
             InsertNewPointsOnEdgesOfOldPolys(polysPoints); // In case of excception, the points added here won't be removed since they don't have visible effect
 
@@ -160,13 +220,9 @@ namespace RikusGameDevToolbox.Geometry2d
 
             poly.Points = polysPoints;
 
+            return poly;
  
-            Guid id = Guid.NewGuid();
-            poly.Id = id;
-            _polys.Add(id, poly);
-            _outlinesAreUpToDate = false;
-            
-            return id;
+          
 
             
             Edge CreateNewEdge(Point point1, Point point2)
@@ -185,6 +241,7 @@ namespace RikusGameDevToolbox.Geometry2d
                 }
                 return edge;
             }
+            
             
             // Given the list of point in a new polygon, this finds points of old polygons that split the
             // edges of the new polygon and insert them into the list.
@@ -258,8 +315,8 @@ namespace RikusGameDevToolbox.Geometry2d
             }
 
         }
-
-        public void RemovePolygon(Guid id)
+        
+        private void RemoveGeometry(Guid id)
         {
              var poly = _polys[id];
 
@@ -302,39 +359,10 @@ namespace RikusGameDevToolbox.Geometry2d
                  _edges.Remove(edge);
              }
              
-             _polys.Remove(id);
-
-             _outlinesAreUpToDate = false;
+             poly.Points.Clear();
         }
 
-        public int NumberOfSeparateMeshes()
-        {
-            throw new NotImplementedException();
-        }
-
-        public Polygon ShapeAsPolygon()
-        {
-            throw new NotImplementedException();
-        }
-
-
-        /// <summary>
-        /// Call this in OnDrawGizmos() to visualize the mesh for debugging purposes.
-        /// </summary>
-        public void DrawWithGizmos()
-        {
-            Gizmos.color = Color.yellow;
-
-            foreach (var edge in _edges)
-            { 
-                Gizmos.DrawLine(edge.Point1.Position, edge.Point2.Position);
-            }
-        
-        }
-
-        #endregion
-
-        #region ------------------------------------------ PRIVATE METHODS ----------------------------------------------
+     
 
         /// <summary> Return an existing point in given position or null if one does not exist.</summary>
         private Point ExistingPointAt(Vector2 position)
