@@ -100,7 +100,7 @@ namespace RikusGameDevToolbox.Geometry2d
            //     neighbours.Add((edge.Left, edge.Right));
             }
 
-            var mesh = new PolygonMesh2(minEdgeLength);
+            var mesh = new PolygonMesh2();
             foreach (SimplePolygon polygon in polygons.Values)
             {
                 try
@@ -117,6 +117,8 @@ namespace RikusGameDevToolbox.Geometry2d
             {
                 mesh.MarkAsNeighbours(polygons[siteA], polygons[siteB]);
             }*/
+
+            mesh.FuseVertices(minEdgeLength);
             
             return mesh;
 
