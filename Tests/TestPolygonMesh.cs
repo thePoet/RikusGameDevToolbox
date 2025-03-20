@@ -109,6 +109,41 @@ public class TestsPolygonMesh
 
     }
 
+    [Test]
+    public void ShortEdgeFuse()
+    {
+        Vector2 p1 = new Vector2(0, 0);
+        Vector2 p2 = new Vector2(10, 0);
+        Vector2 p3 = new Vector2(10, 10);
+        Vector2 p4 = new Vector2(0, 10);
+        Vector2 p5 = new Vector2(5, 5);
+        Vector2 p6 = new Vector2(6, 5);
+    
+        SimplePolygon a = new SimplePolygon( new[] { p1,p5,p4 } );
+        SimplePolygon b = new SimplePolygon( new[] { p1,p2,p6,p5 } );
+        SimplePolygon c = new SimplePolygon( new[] { p2,p3,p6 } );
+        SimplePolygon d = new SimplePolygon( new[] { p5,p6,p3,p4 } );
+        
+
+        var mesh = new PolygonMesh2();
+
+        mesh.AddPolygon(a);
+        mesh.AddPolygon(b);
+        mesh.AddPolygon(c);
+        mesh.AddPolygon(d);
+        Assert.IsTrue(mesh.Edges().Count == 14);
+        Assert.IsTrue(mesh.Points().Count == 14);
+      
+        mesh.FuseVertices(2f);
+        
+        Debug.Log(mesh.DebugInfo());
+        IntegrityTest(mesh);
+
+        
+        Assert.IsTrue(mesh.Edges().Count == 8);
+        Assert.IsTrue(mesh.Points().Count == 5);
+
+    }
 
 
     [Test]
@@ -221,7 +256,7 @@ public class TestsPolygonMesh
     private static void IntegrityTest(PolygonMesh2 mesh)
     {
         var result = mesh.TestForIntegrity();
-        if (result.message != "") Debug.Log(result.message);
+        if (result.message != "") Debug.Log("INTEGRITY FAILED\n" + result.message);
         Assert.IsTrue(result.success);
         
     }

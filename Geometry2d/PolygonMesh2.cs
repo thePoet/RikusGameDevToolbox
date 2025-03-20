@@ -10,19 +10,6 @@ namespace RikusGameDevToolbox.Geometry2d
 {
     public class PolygonMesh2
     {
-        private record Connection;
-        
-        private record SharedEdge : Connection
-        {
-            public readonly Edge Edge;
-            public SharedEdge(Edge edge) => this.Edge = edge;
-        }
-
-        private record ConnectedViaPoint : Connection
-        {
-            public Point PointInMiddle;
-            public ConnectedViaPoint(Point point) => PointInMiddle = point;
-        }
         
         
         private class Point
@@ -35,14 +22,15 @@ namespace RikusGameDevToolbox.Geometry2d
                 Position = position;
             }
 
-            /// <summary> Returns the edge that connects this point to the otherPoint, null if no such edge exists.</summary>
+            /// <summary> Returns the edge th  at connects this point to the otherPoint, null if no such edge exists.</summary>
             public Edge EdgeConnectingTo(Point otherPoint) => Edges.FirstOrDefault(edge => edge.HasPoint(otherPoint));
             public bool IsConnectedTo(Point otherPoint) => Edges.Any(edge => edge.HasPoint(otherPoint));
 
             public IEnumerable<Point> ConnectedPoints => Edges.Select(edge => edge.Point1 == this ? edge.Point2 : edge.Point1)
                                                               .Distinct();
 
-            public override string ToString() => "Point [" + GetHashCode() % 999 + "]: " + Position;
+            public override string ToString() => "Point " + ShortHash +  ": " + Position;
+            internal string ShortHash => "[" + Math.Abs(GetHashCode()) % 999 + "]";
         }
 
         private class Edge
@@ -76,7 +64,10 @@ namespace RikusGameDevToolbox.Geometry2d
                 throw new  ArgumentException("Old point not found in edge.");
 
             }
-            public override string ToString() => "Edge: [" + GetHashCode() % 999 + "] " + Point1 + " -> " + Point2;
+            internal string ShortHash => "[" + Math.Abs(GetHashCode()) % 999 + "]";
+            public override string ToString() => "Edge: " + ShortHash + " " + Point1 + " -> " + Point2 
+                                                 + " Left: " + (LeftPoly == null ? "null" : LeftPoly.ShortHash) 
+                                                 + " Right: " + (RightPoly == null ? "null" : RightPoly.ShortHash);
         }
 
         private class Poly
@@ -93,8 +84,9 @@ namespace RikusGameDevToolbox.Geometry2d
                 }
             }
             
-            public override string ToString() => "Polygon: " + string.Join(", ", Points.Select(p => p.ToString()));
+            public override string ToString() => "Polygon: " + ShortHash +"   " + string.Join(", ", Points.Select(p => p.ToString()));
             
+            internal string ShortHash => "[" + Math.Abs(GetHashCode()) % 999 + "]";
        
         }
 
@@ -188,7 +180,7 @@ namespace RikusGameDevToolbox.Geometry2d
                 
                 foreach (var nearbyPoint in PointsWithinTolerance(point))
                 {
-                    if (CanFuse(point, nearbyPoint))
+                    if (IsFuseAllowed(point, nearbyPoint))
                     {
                         Fuse(point, nearbyPoint);
                        
@@ -213,11 +205,11 @@ namespace RikusGameDevToolbox.Geometry2d
                     .Where(p => p != point).ToList();
             }
             
-            bool CanFuse(Point point1, Point point2)
+            bool IsFuseAllowed(Point point1, Point point2)
             {
                 if (point1==point2) return false;
-                // No direct connecting edge allowed
-               if (point1.EdgeConnectingTo(point2) != null) return false;
+                // No direct connecting edge allowed–––
+               //if (point1.EdgeConnectingTo(point2) != null) return false;
                 
                 foreach (var middlePoint in PointsConnectedToBoth(point1, point2))
                 {
@@ -236,7 +228,11 @@ namespace RikusGameDevToolbox.Geometry2d
             
             void Fuse(Point remainingPoint, Point removedPoint)
             {
-                ReplacePointInPolys(removedPoint, remainingPoint);
+            //    Debug.Log(DebugInfo());
+          //      Debug.Log(" ----- FUSING " + removedPoint + "  INTO " + remainingPoint + " -----");
+             
+                var affectedPolys = PolysWithPoint(removedPoint);   
+             //   ReplacePointInPolys(removedPoint, remainingPoint);
                 
                 List<Edge> edgesToDestroy = new();
                 List<Edge> edgesToAttach = new();
@@ -260,16 +256,44 @@ namespace RikusGameDevToolbox.Geometry2d
 
                 foreach (var edge in edgesToDestroy)
                 {
-                    Edge edgeMergedInto = edge.PointThatIsNot(removedPoint).EdgeConnectingTo(remainingPoint);
-                    
                     edge.PointThatIsNot(removedPoint).Edges.Remove(edge);
-
-                    if (edgeMergedInto != null)
-                    {
-                        if (edgeMergedInto.LeftPoly == null) edgeMergedInto.LeftPoly = edge.LeftPoly ?? edge.RightPoly;
-                        if (edgeMergedInto.RightPoly == null) edgeMergedInto.RightPoly = edge.LeftPoly ?? edge.RightPoly;
-                    }
                     _edges.Remove(edge);
+                }
+                
+                // Update polygons
+                foreach (var poly in affectedPolys.ToList())
+                {
+                    if (poly.Points.Contains(remainingPoint))
+                    {
+                        poly.Points.Remove(removedPoint);
+                    }
+                    else
+                    {
+                        int index = poly.Points.IndexOf(removedPoint);
+                        poly.Points[index] = remainingPoint;
+                    }
+                        
+              
+                    foreach (var (a,b) in AsLoopingPairs(poly.Points))
+                    {
+                        var edge = a.EdgeConnectingTo(b);
+                        if (edge == null)
+                        {
+                            Debug.Log("Something wrong with edges in poly");
+                        }
+                        else
+                        {
+                            if (a == edge.Point1)
+                            {
+                                edge.LeftPoly = poly;
+                            }
+                            else
+                            {
+                                edge.RightPoly = poly;
+                            }                        
+                        }
+                        
+                    }
                 }
                 
                 _points.Remove(removedPoint.Position, removedPoint);
@@ -295,11 +319,25 @@ namespace RikusGameDevToolbox.Geometry2d
             // Replaces the removed point with the remaining point in all polygons that contain the removed point
             void ReplacePointInPolys(Point removed, Point remain)
             {
-                var polys = PolysWithPoint(removed);
+                var polys = PolysWithPoint(removed).ToList();
+
+                foreach (var p in polys)
+                {
+                    if (!p.Points.Contains(removed))
+                    {
+                        Debug.LogError("Something wrong with point replacing");
+                        Debug.Log(TestForIntegrity().message);
+                        throw new InvalidOperationException();
+                    }
+                }
+                
                 foreach (var poly in polys)
                 {
+                    Debug.Log("--- Poly before " + poly);
+                    
                     if (poly.Points.Contains(remain))
                     {
+                   
                         poly.Points.Remove(removed);
                         //   throw new InvalidOperationException("Remaining point already in polygon.");
                     }
@@ -308,6 +346,7 @@ namespace RikusGameDevToolbox.Geometry2d
                         int index = poly.Points.IndexOf(removed);
                         poly.Points[index] = remain;
                     }
+                    Debug.Log("--- Poly after " + poly);
 
                 }
             }
@@ -331,6 +370,62 @@ namespace RikusGameDevToolbox.Geometry2d
         public Polygon ShapeAsPolygon()
         {
             throw new NotImplementedException();
+        }
+        
+        /// <summary>
+        /// Makes a deep copy of the mesh.
+        /// </summary>
+        /// <param name="preservePolygonIds">If false new ids are assigned at random.</param>
+        public PolygonMesh2 MakeCopy(bool preservePolygonIds=false)
+        {
+            PolygonMesh2 newMesh = new();
+            newMesh._outlinesAreUpToDate = _outlinesAreUpToDate;
+            newMesh._longestEdgeLength = _longestEdgeLength;
+            
+            var p2p = new Dictionary<Point, Point>();
+            var e2e = new Dictionary<Edge, Edge>();
+            var poly2poly = new Dictionary<Poly, Poly>();
+
+
+            foreach (var point in _points)
+            {
+                var newPoint = new Point(point.Position);
+                p2p.Add(point,newPoint);
+                newMesh._points.Add(newPoint.Position, newPoint);
+            }
+
+            foreach (var (id, poly) in _polys)
+            {
+                var newPoly = new Poly();
+                if (preservePolygonIds) newPoly.Id = id;
+                else newPoly.Id = Guid.NewGuid();
+              
+                foreach (var p in poly.Points)
+                {
+                    newPoly.Points.Add(p2p[p]);
+                }
+                poly2poly.Add(poly, newPoly);
+                newMesh._polys.Add(newPoly.Id, newPoly); 
+            }
+
+            foreach (var edge in _edges)
+            {
+                var newEdge = new Edge();
+                newEdge.Point1 = p2p[edge.Point1];
+                newEdge.Point2 = p2p[edge.Point2];
+                if (edge.LeftPoly!=null) newEdge.LeftPoly = poly2poly[edge.LeftPoly];
+                if (edge.RightPoly!=null) newEdge.RightPoly = poly2poly[edge.RightPoly];
+                
+       
+               newMesh._edges.Add(newEdge);
+               
+               newEdge.Point1.Edges.Add(newEdge);
+               newEdge.Point2.Edges.Add(newEdge);
+               
+            }
+
+            return newMesh;
+
         }
 
 
@@ -374,7 +469,8 @@ namespace RikusGameDevToolbox.Geometry2d
                         continue;
                     }
                     
-                    if ( (a==edge.Point1 && edge.LeftPoly != poly) || (a==edge.Point2 && edge.RightPoly != poly))
+                    if ( (a==edge.Point1 && edge.LeftPoly != poly) || 
+                         (a==edge.Point2 && edge.RightPoly != poly))
                     {
                         Problem("Polygons edge does not have the polygon on the correct side. " + poly);
                     }
