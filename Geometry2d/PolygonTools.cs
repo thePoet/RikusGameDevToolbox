@@ -33,6 +33,15 @@ namespace RikusGameDevToolbox.Geometry2d
             }
             return new SimplePolygon(points);
         }
+
+        public static bool IsClockwise(IEnumerable<Vector2> points)
+        {
+            var path = ToPathD(points);
+            return !Clipper.IsPositive(path);
+            
+            PathD ToPathD(IEnumerable<Vector2> points) => new (points.Select(ToPointD)); 
+            PointD ToPointD(Vector2 point) => new (point.x, point.y);
+        }
         
         
         /// <summary>
@@ -53,8 +62,8 @@ namespace RikusGameDevToolbox.Geometry2d
             
             int SortByAngle(Vector2 p1, Vector2 p2)
             {
-                float angle1 = Math2d.GetAngle(Vector2.up, p1-center);
-                float angle2 = Math2d.GetAngle(Vector2.up, p2-center);
+                float angle1 = Vector2.SignedAngle(Vector2.up, p1-center);
+                float angle2 = Vector2.SignedAngle(Vector2.up, p2-center);
                 return angle1.CompareTo(angle2);
             }
    

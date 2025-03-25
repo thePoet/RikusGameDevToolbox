@@ -9,14 +9,6 @@ namespace RikusGameDevToolbox.GeneralUse
         public static Vector2 RotateVector(Vector2 v, float degrees) => Quaternion.Euler(0, 0, degrees) * v;
         
 
-        // Returns signed angle between vectors
-        // (Untested)
-        public static float GetAngle(Vector2 v1, Vector2 v2)
-        {
-            var sign = Mathf.Sign(v1.x * v2.y - v1.y * v2.x);
-
-            return Vector2.Angle(v1, v2) * sign;
-        }
 
         // TODO: Move to Angle and simplify
         public static float ClampAngle(float angle, float min, float max)
