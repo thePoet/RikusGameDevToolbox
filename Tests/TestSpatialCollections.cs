@@ -87,7 +87,6 @@ public class TestSpatialCollections
     [Test]
     public void AddDeleteCyclesItems()
     {
-     
         var sc = new SpatialCollection2d<Item>();
         List<Item> items = new List<Item>();
 
@@ -120,7 +119,56 @@ public class TestSpatialCollections
             Assert.IsTrue(SameContents(sc.ToList(), items));
         }
     }
-    
+
+    [Test]
+    public void Performance()
+    {
+        int numberOfItems = 50000;
+        
+
+        List<Item> items = new List<Item>();
+        for (int i = 0; i < numberOfItems; i++)
+        {
+            Item item = new Item
+            {
+                Id = i,
+                Position = new Vector2(Random.Range(-50f, 50f), Random.Range(-50f, 50f))
+            };
+            items.Add(item);
+        }
+        
+        
+        
+        var sc = new SpatialCollection2d<Item>();
+
+        float t1 = Time.realtimeSinceStartup;
+        foreach (var item in items)
+        {
+            sc.Add(item.Position, item); 
+        }  
+        float t2 = Time.realtimeSinceStartup;
+        Debug.Log("Adding " + numberOfItems + " items took " + (t2 - t1) * 1000f + " ms");
+
+        t1 = Time.realtimeSinceStartup;
+       
+        for (int i = 0; i < numberOfItems; i++)
+        {
+            var result = sc.ItemsInCircle(new Vector2(Random.Range(-50f, 50f), Random.Range(-50f, 50f)), 0.5f);
+         
+        }
+        t2 = Time.realtimeSinceStartup;
+        Debug.Log("Doing " + numberOfItems + " searches took " + (t2 - t1) * 1000f + " ms");
+        
+        t1 = Time.realtimeSinceStartup;
+        foreach (var item in items)
+        {
+            sc.Remove(item.Position, item); 
+        }  
+        t2 = Time.realtimeSinceStartup;
+        Debug.Log("Removing " + numberOfItems + " items took " + (t2 - t1) * 1000f + " ms");
+
+        
+    }
     
     private SpatialCollection2d<Item> CollectionWithItems(List<Item> items)
     {

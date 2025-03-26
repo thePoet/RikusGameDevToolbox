@@ -9,7 +9,6 @@ namespace RikusGameDevToolbox.GeneralUse
         public static Vector2 RotateVector(Vector2 v, float degrees) => Quaternion.Euler(0, 0, degrees) * v;
         
 
-
         // TODO: Move to Angle and simplify
         public static float ClampAngle(float angle, float min, float max)
         {

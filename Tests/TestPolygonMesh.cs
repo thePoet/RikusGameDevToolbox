@@ -1,6 +1,6 @@
+using System.Collections.Generic;
 using System.Linq;
 using NUnit.Framework;
-using RikusGameDevToolbox.GeneralUse;
 using RikusGameDevToolbox.Geometry2d;
 using UnityEngine;
 
@@ -24,9 +24,27 @@ public class TestsPolygonMesh
     private readonly SimplePolygon _g = new(PointsG);
 
 
+/*
+ * Output: 
+   Time add 22500 polygons 719.0475 ms
+   Time make a copy 1136.566 ms
+   Time to fuse vertices 6657.646 ms
+   Time to fuse vertices (fusing to edges enabled)5768.463 ms
+   Time to add and fuse 3022.667 ms
+   
+   Time add 22500 polygons 551.9467 ms
+   Time make a copy 1038.917 ms
+   Time to fuse vertices 5820.129 ms
+   Time to fuse vertices (fusing to edges enabled)5801.161 ms
+   Time to add and fuse 3057.964 ms
+   
+   Time add 22500 polygons 590.2825 ms
+   Time make a copy 1169.052 ms
+   Time to fuse vertices 5882.709 ms
+   Time to fuse vertices (fusing to edges enabled)5921.272 ms
+   Time to add and fuse 2936.172 ms
+ */
 
-    
-    
     [Test]
     public void AddingPolygons()
     {
@@ -257,7 +275,61 @@ public class TestsPolygonMesh
         Assert.IsTrue(mesh.PolygonIds().Count == 1);
     }
 
+    [Test]
+    public void Performance()
+    {
+        int n = 150;
+        
+        Vector2[] points1 = { new(0, 0), new(10, 0), new(10, 10), new(0, 10) };
+        SimplePolygon poly = new SimplePolygon(points1);
+        
+        List<SimplePolygon> polygons = new();
+        
+        for (int i=0;i<n;i++)
+        {
+            for (int j = 0; j < n; j++)
+            {
+                Vector2 offset = new Vector2(i * 10f, j * 10f);
+                polygons.Add(poly.Translate(offset));
+            }
+        }
+        
+        var mesh = new PolygonMesh2();
 
+        float t1, t2;
+
+        t1 = Time.realtimeSinceStartup;
+        foreach (var p in polygons)
+        {
+            mesh.AddPolygon(p);
+        }
+        t2 = Time.realtimeSinceStartup;
+        Debug.Log("Time add "+ n*n + " polygons " + (t2 - t1)*1000f + " ms");
+       
+        t1 = Time.realtimeSinceStartup;
+        var m2 = mesh.MakeCopy();
+        t2 = Time.realtimeSinceStartup;
+        Debug.Log("Time make a copy " + (t2 - t1)*1000f + " ms");
+        
+        t1 = Time.realtimeSinceStartup;
+        mesh.FuseVertices(0.01f);
+        t2 = Time.realtimeSinceStartup;
+        Debug.Log("Time to fuse vertices " + (t2 - t1)*1000f + " ms");
+     
+        t1 = Time.realtimeSinceStartup;
+        m2.FuseVertices(0.01f, fuseToEdges:true);
+        t2 = Time.realtimeSinceStartup;
+        Debug.Log("Time to fuse vertices (fusing to edges enabled)" + (t2 - t1)*1000f + " ms");
+        
+        var m3 = mesh.MakeCopy();
+        t1 = Time.realtimeSinceStartup;
+        foreach (var p in polygons)
+        {
+            m3.AddPolygonAndFuseVertices(p, 0.01f);
+        }
+        t2 = Time.realtimeSinceStartup;
+        Debug.Log("Time to add and fuse " + (t2 - t1)*1000f + " ms");
+    }
 
     bool AlmostSame(Vector2 a, Vector2 b)
     {
