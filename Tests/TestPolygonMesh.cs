@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using NUnit.Framework;
@@ -273,6 +274,67 @@ public class TestsPolygonMesh
         Assert.IsTrue(mesh.Edges().Count == 3);
         Assert.IsTrue(mesh.Points().Count == 3);
         Assert.IsTrue(mesh.PolygonIds().Count == 1);
+    }
+    
+    
+    [Test]
+    public void CopyMesh()
+    {
+        var mesh = new PolygonMesh2();
+
+        Vector2[] points1 = { new(0, 0), new(10, 0), new(10, 10), new(0, 10) };
+        Vector2[] points2 = { new(0, 0), new(5, -5), new(10, 0) };
+        Vector2[] points3 = { new(10, 0), new(15, 5), new(10, 10) };
+
+        var poly1 = mesh.AddPolygon(new SimplePolygon(points1));
+        var poly2 = mesh.AddPolygon(new SimplePolygon(points2));
+        var poly3 = mesh.AddPolygon(new SimplePolygon(points3));
+        mesh.FuseVertices(0.1f);
+        Assert.IsTrue(mesh.Edges().Count == 8);
+        Assert.IsTrue(mesh.Points().Count == 6);
+        Assert.IsTrue(mesh.PolygonIds().Count == 3);
+
+
+        PolygonMesh2 mesh2 = mesh.MakeCopy();
+        IntegrityTest(mesh2);
+        Assert.IsTrue(mesh2.Edges().Count == 8);
+        Assert.IsTrue(mesh2.Points().Count == 6);
+        Assert.IsTrue(mesh2.PolygonIds().Count == 3);
+        Assert.IsTrue(!mesh2.PolygonIds().Contains(poly1));
+        Assert.IsTrue(!mesh2.PolygonIds().Contains(poly2));
+        Assert.IsTrue(!mesh2.PolygonIds().Contains(poly3));
+        PolygonMesh2 mesh3 = mesh.MakeCopy(preservePolygonIds:true);
+        Assert.IsTrue(mesh3.PolygonIds().Contains(poly1));
+        Assert.IsTrue(mesh3.PolygonIds().Contains(poly2));
+        Assert.IsTrue(mesh3.PolygonIds().Contains(poly3));
+      
+    }
+    
+    [Test]
+    public void PartialCopyMesh()
+    {
+        var mesh = new PolygonMesh2();
+
+        Vector2[] points1 = { new(0, 0), new(10, 0), new(10, 10), new(0, 10) };
+        Vector2[] points2 = { new(0, 0), new(5, -5), new(10, 0) };
+        Vector2[] points3 = { new(10, 0), new(15, 5), new(10, 10) };
+
+        var poly1 = mesh.AddPolygon(new SimplePolygon(points1));
+        var poly2 = mesh.AddPolygon(new SimplePolygon(points2));
+        var poly3 = mesh.AddPolygon(new SimplePolygon(points3));
+        mesh.FuseVertices(0.1f);
+        Assert.IsTrue(mesh.Edges().Count == 8);
+        Assert.IsTrue(mesh.Points().Count == 6);
+        Assert.IsTrue(mesh.PolygonIds().Count == 3);
+
+
+        PolygonMesh2 mesh2 = mesh.MakeCopy(true, new List<Guid>(){poly2, poly3});
+        IntegrityTest(mesh2);
+        Assert.IsTrue(mesh2.Edges().Count == 6);
+        Assert.IsTrue(mesh2.Points().Count == 5);
+        Assert.IsTrue(mesh2.PolygonIds().Count == 2);
+     
+      
     }
 
     [Test]
