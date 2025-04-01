@@ -12,9 +12,6 @@ namespace RikusGameDevToolbox.Geometry2d
     [Serializable]
     public class SimplePolygon : Polygon, IEquatable<SimplePolygon>
     {
-       // private List<Vector2> Contour => Paths[0].Select(p => new Vector2((float)p.x, (float)p.y)).ToList();
-  
-
         #region ------------------------------------------ PUBLIC METHODS -----------------------------------------------
 
         /// <summary>
@@ -30,8 +27,6 @@ namespace RikusGameDevToolbox.Geometry2d
         {
             SetPoints(points);
         }
-
-
          
         public bool IsIntersecting(SimplePolygon other)
         {
@@ -40,8 +35,6 @@ namespace RikusGameDevToolbox.Geometry2d
                    other.Contour.Any(p => polygon.IsPointInside(p) || polygon.IsPointOnEdge(p));
         }
 
-
-
         /// <summary>
         /// Return true if all the points of this polygon are inside or on the edge of the other polygon. 
         /// </summary>
@@ -49,13 +42,11 @@ namespace RikusGameDevToolbox.Geometry2d
         {
             return Contour.All(p=> other.IsPointInside(p) || other.IsPointOnEdge(p));
         }
-  
- 
 
         public bool IsSharingVerticesWith(SimplePolygon other, float epsilon)
         {
            return Contour.Any(point1 => other.Contour.Any(point2 => SamePoint(point1,point2)));
-           
+
            bool SamePoint(Vector2 p1, Vector2 p2) => Vector2.Distance(p1, p2) < epsilon;
         }
         
@@ -150,9 +141,7 @@ namespace RikusGameDevToolbox.Geometry2d
                     area += addArea;
                 }
             }
-          
             centroid /= area;
-
             return centroid;
         }
         
@@ -166,7 +155,6 @@ namespace RikusGameDevToolbox.Geometry2d
             return sameNumberOfPoints && samePoints;
         }
         
-        
         #endregion
         #region ----------------------------------------- INTERNAL METHODS ---------------------------------------------
 
@@ -179,23 +167,12 @@ namespace RikusGameDevToolbox.Geometry2d
             // make copy of path
             PathD pathCopy = new PathD(path);
             Paths = new PathsD { pathCopy };
-           /* _points = new List<Vector2>();
-            foreach (var point in Paths[0])
-            {
-                _points.Add(new Vector2((float)point.x, (float)point.y));
-            }*/
         }
         #endregion
         #region ------------------------------------------ PRIVATE METHODS ----------------------------------------------
       
         private void SetPoints(IEnumerable<Vector2> points)
-        {/*
-            _points = new List<Vector2>(points);
-            if (_points.Count() < 3)
-            {
-                throw new ArgumentException("A polygon must have at least 3 sides.");
-            }*/
-       //     var path = ToPathD(_points);
+        {
             var path = ToPathD(points);
             if (!Clipper.IsPositive(path)) throw new ArgumentException("Polygon's points must be given in counter-clockwise order.");
             Paths = new PathsD { path };

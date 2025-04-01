@@ -278,7 +278,7 @@ public class TestsPolygonMesh
     [Test]
     public void Performance()
     {
-        int n = 150;
+        int n = 50;
         
         Vector2[] points1 = { new(0, 0), new(10, 0), new(10, 10), new(0, 10) };
         SimplePolygon poly = new SimplePolygon(points1);

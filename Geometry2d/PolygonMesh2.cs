@@ -3,7 +3,6 @@ using System.Collections.Generic;
 using System.Linq;
 using RikusGameDevToolbox.GeneralUse;
 using UnityEngine;
-using Clipper2Lib;
 
 
 namespace RikusGameDevToolbox.Geometry2d
@@ -81,6 +80,8 @@ namespace RikusGameDevToolbox.Geometry2d
             public List<Point> Points = new(); // CCW order
             public SimplePolygon AsSimplePolygon() => new(Points.Select(p => p.Position).ToArray());
 
+            public bool traversed = false;
+
             public IEnumerable<Edge> Edges()
             {
                 foreach (var (point1, point2) in AsLoopingPairs(Points))
@@ -100,7 +101,7 @@ namespace RikusGameDevToolbox.Geometry2d
         {
             public List<Point> points = new();
             public bool isHole = false;
-            public bool isIncomplete = false;
+          
         }
 
 
@@ -112,6 +113,7 @@ namespace RikusGameDevToolbox.Geometry2d
         private readonly HashSet<Edge> _edges = new();
         private readonly Dictionary<Guid, Poly> _polys = new();
         private List<Outline> _outlines = new();
+        private float _longestEdgeLength = 0f;
         #endregion
 
         #region ------------------------------------------ PUBLIC METHODS -----------------------------------------------
@@ -131,7 +133,27 @@ namespace RikusGameDevToolbox.Geometry2d
 
         public List<(Guid, SimplePolygon)> Polygons() => _polys.Select(kvp => (kvp.Key, kvp.Value.AsSimplePolygon())).ToList();
 
+        public List<List<Vector2>> Outlines()
+        {
+            if (!_outlinesAreUpToDate) UpdateOutlines();
+            return _outlines.Where(o => !o.isHole)
+                .Select(o => o.points.Select(p => p.Position).ToList()).ToList();
+        }
+        
+        public List<List<Vector2>> Holes()
+        {
+            if (!_outlinesAreUpToDate) UpdateOutlines();
+            return _outlines.Where(o => o.isHole)
+                .Select(o => o.points.Select(p => p.Position).ToList()).ToList();
+        }
 
+        public List<(Vector2, Vector2)> DebugBorderEdges() => _edges
+            .Where(e=>e.NumberOfPolys<2)
+            .Select(e => (e.Point1.Position, e.Point2.Position)).ToList();
+
+        
+        public int NumPolygons => _polys.Count;
+        
         public Guid AddPolygon(SimplePolygon shape)
         {
             Poly poly = CreatePolygon(shape);
@@ -151,8 +173,41 @@ namespace RikusGameDevToolbox.Geometry2d
             HashSet<Point> points = new(poly.Points);
             FusePoints(points, tolerance);
             
-            if (fuseToEdges) throw new NotImplementedException("Fusing to edges not implemented yet.");
+            /*
+            if (!fuseToEdges) return poly.Id;
+
+            
+            HashSet<Point> newPoints = new();
+            var edgePoints = InsertPointsOnEdgesWherePointsAlreadyExist(poly.Edges(), tolerance);
+            newPoints.UnionWith(edgePoints);
+            FusePoints(newPoints, tolerance);
+           
+   */
+
+            
+
+
+
             return poly.Id;
+
+
+
+            List<Point> InsertPointsOnEdgesWherePointsAlreadyExist(IEnumerable<Edge> edges, float tolerance)
+            {
+                List<Point> result = new();
+                foreach (var edge in edges)
+                {
+                    var pointsOnEdge = PointsOnEdge(edge.Point1, edge.Point2, tolerance);
+                    if (!pointsOnEdge.Any()) continue;
+                    var newEdgePoints = pointsOnEdge.Select(p => new Point(p.Position))
+                        .OrderBy(p => Vector2.Distance(p.Position, edge.Point1.Position))
+                        .ToList();
+                    InsertPointsIntoEdge(newEdgePoints, edge);
+                    result.AddRange(newEdgePoints);
+                }
+
+                return result;
+            }
         }
         
         public void ChangeShapeOfPolygon(Guid id, SimplePolygon newShape)
@@ -170,8 +225,6 @@ namespace RikusGameDevToolbox.Geometry2d
             }
             _outlinesAreUpToDate = false; 
         }
-
-       
 
         public void RemovePolygon(Guid id)
         {
@@ -197,6 +250,8 @@ namespace RikusGameDevToolbox.Geometry2d
             }
             return result;
         }
+        
+        
 
         public void FuseVertices(float tolerance, bool fuseToEdges = false)
         {
@@ -219,16 +274,13 @@ namespace RikusGameDevToolbox.Geometry2d
                 var pointsOnEdge = PointsOnEdge(edge.Point1, edge.Point2, tolerance);
                 if (!pointsOnEdge.Any()) continue;
 
-                var dublicates = pointsOnEdge.Select(p => new Point(p.Position))
+                var newEdgePoints = pointsOnEdge.Select(p => new Point(p.Position))
                     .OrderBy(p => Vector2.Distance(p.Position, edge.Point1.Position))
                     .ToList();
 
-                InsertPointsIntoEdge(dublicates, edge);
+                InsertPointsIntoEdge(newEdgePoints, edge);
 
-                foreach (var p in dublicates)
-                {
-                    createdPoints.Add(p);
-                }
+                createdPoints.UnionWith(newEdgePoints);
             }
 
             foreach (var p in createdPoints)
@@ -238,10 +290,7 @@ namespace RikusGameDevToolbox.Geometry2d
 
 
             FusePoints(createdPoints, tolerance);
-
-            return;
-
-            // --------------------
+            
         }
 
         public void TrimShortEdges(float minLength, bool excludeOutline=false)
@@ -260,11 +309,85 @@ namespace RikusGameDevToolbox.Geometry2d
             return _outlines.Count(o => !o.isHole);
         }
 
-        public Polygon ShapeAsPolygon()
+        /// <summary>
+        /// Returns the shape of the whole mesh
+        /// </summary>
+        public List<Polygon> Shape()
         {
-            throw new NotImplementedException();
+            return Polygon.CreateFromOutlines(_outlines
+                .Select(o => o.points.Select(p => p.Position)));
         }
         
+        
+        public List<PolygonMesh2> DetachDisconnectedAreas()
+        {
+            float tolerance = 0.01f; //TODO: remove magic number
+            
+            if (!_outlinesAreUpToDate) UpdateOutlines();
+
+
+            var outlines = _outlines.Where(o =>  !o.isHole)
+                .OrderByDescending(o => o.points.Count).ToList();
+
+            List<PolygonMesh2> result = new();
+            
+            for (int i = 1; i < outlines.Count(); i++)
+            {
+                Poly firstPoly = SomePolygonInsideOutline(outlines[i]);
+                HashSet<Poly> polys = PolygonsConnectedTo(firstPoly);
+                PolygonMesh2 mesh = new();
+               
+                foreach (var poly in polys)
+                {
+                    RemovePolygon(poly.Id);
+                    
+                    SimplePolygon shape = new SimplePolygon(poly.Points.Select(p => p.Position));
+
+                    Poly p = mesh.CreatePolygon(shape);
+                    p.Id = poly.Id;
+                    mesh._polys.Add(p.Id, poly);
+                }
+                mesh._outlinesAreUpToDate = false;
+                mesh.FuseVertices(tolerance);
+                result.Add(mesh);
+            }
+            _outlinesAreUpToDate = false;
+
+            return result;
+            
+            Poly SomePolygonInsideOutline(Outline outline)
+            {
+                Edge edge = outline.points[0].EdgeConnectingTo(outline.points[1]);
+                return edge.RightPoly ?? edge.LeftPoly;
+            }
+
+            HashSet<Poly> PolygonsConnectedTo(Poly poly)
+            {
+                HashSet<Poly> result = new();
+                Traverse(poly);
+                return result;
+            
+                void Traverse(Poly polygon)
+                {
+                    result.Add(polygon);
+             
+                    foreach (var edge in polygon.Edges())
+                    {
+                        if (edge.LeftPoly != null && edge.LeftPoly!=polygon && !result.Contains(edge.LeftPoly))
+                        {
+                            Traverse(edge.LeftPoly);
+                        }
+                        if (edge.RightPoly != null && edge.RightPoly != polygon && !result.Contains(edge.RightPoly))
+                        {
+                            Traverse(edge.RightPoly);
+                        }
+                    }
+                }
+            }
+          
+        }
+
+
         /// <summary>
         /// Makes a deep copy of the mesh.
         /// </summary>
@@ -415,10 +538,12 @@ namespace RikusGameDevToolbox.Geometry2d
         {
             Gizmos.color = Color.blue;
             foreach (var edge in _edges)
-            { /*
+            { 
+                /*
                 if (edge.LeftPoly == null || edge.RightPoly == null)
                 {
                     Gizmos.color = Color.yellow;
+                    
                     Vector2 middle = (edge.Point1.Position + edge.Point2.Position) / 2;
                     Vector2 direction = (edge.Point2.Position - edge.Point1.Position).normalized;
                     float length = Vector2.Distance(edge.Point1.Position, edge.Point2.Position);
@@ -484,6 +609,9 @@ namespace RikusGameDevToolbox.Geometry2d
                 };
                 point1.Edges.Add(edge);
                 point2.Edges.Add(edge);
+                
+                float length = Vector2.Distance(point1.Position, point2.Position);
+                if (length>_longestEdgeLength) _longestEdgeLength = length;
           
                 return edge;
             }
@@ -741,6 +869,12 @@ namespace RikusGameDevToolbox.Geometry2d
             while (outlineEdges.Any())
             {
                 var outline = ExtractOutline(outlineEdges.First(), outlineEdges);
+                if (outline == null)
+                {
+                    Debug.LogWarning("Incomplete outline found.");
+                    continue;
+                }
+                
                 _outlines.Add(outline);
             }
             
@@ -749,11 +883,16 @@ namespace RikusGameDevToolbox.Geometry2d
             Debug.Log("Time to update outlines: " + (time2 - time1)*1000f + " ms");
             return;
             
+            
+            
+            
             // ---
-            Outline ExtractOutline(Edge startEdge, HashSet<Edge> edges)
+            Outline ExtractOutline(Edge startEdge, HashSet<Edge> borderEdges)
             {
-                edges.Remove(startEdge);
+                // Tämä juuttuu ja muisti loppuu joskus
                 
+                borderEdges.Remove(startEdge);
+
                 Point startPoint = startEdge.Point2;
                 Point lastPoint = startEdge.Point1;
                 Point point = startEdge.Point2;
@@ -761,21 +900,21 @@ namespace RikusGameDevToolbox.Geometry2d
 
                 outline.points.Add(lastPoint);
                 outline.points.Add(point);
+
                 
-                while (true)
+                
+                for (int i=0;i<10000;i++)
                 {
-                    Point nextPoint = TraverseOutline(lastPoint, point);
+                    Point nextPoint = TraverseOutline(lastPoint, point, borderEdges);
 
-                    if (nextPoint == null)
-                    {
-                        outline.isIncomplete = true;
-                        Debug.LogWarning("Incomplete outline found.");
-                        return outline;
-                    }
-
+                    if (nextPoint == null) return null;
                     lastPoint = point;
                     point = nextPoint;
-                    edges.Remove(lastPoint.EdgeConnectingTo(point));
+
+                    Edge edge = lastPoint.EdgeConnectingTo(point);
+                    if (edge == null) throw new InvalidOperationException("No next edge found in outline.");
+                  
+                    borderEdges.Remove(edge);
 
                     if (point == startPoint)
                     {
@@ -792,14 +931,15 @@ namespace RikusGameDevToolbox.Geometry2d
                         return outline;
                     }
                     
-                    
+
                     outline.points.Add(point);
                 }
 
-                return null;
+                throw new InvalidOperationException("Outline extraction caught in infinite loop.");
+                
             }
 
-            Point TraverseOutline(Point previous, Point current)
+            Point TraverseOutline(Point previous, Point current, HashSet<Edge> untraversedEdges)
             {
                 Edge currentEdge = previous.EdgeConnectingTo(current);
                 if (currentEdge == null) return null;
@@ -807,17 +947,10 @@ namespace RikusGameDevToolbox.Geometry2d
                 bool emptyOnRight = currentEdge.RightPoly == null; // relative to traverse direction
                 if (reverseDirection) emptyOnRight = !emptyOnRight;
 
-                Edge nextEdge;
-                
-                if (emptyOnRight)    
-                    nextEdge = current.Edges.Where(e => e.NumberOfPolys == 1 && !e.HasPoint(previous))
-                    .OrderBy(e => AngleCW(currentEdge, e))
-                    .FirstOrDefault();
-                else
-                    nextEdge = current.Edges.Where(e => e.NumberOfPolys == 1 && !e.HasPoint(previous))
-                        .OrderBy(e => 360f-AngleCW(currentEdge, e))
+                Edge nextEdge = current.Edges.Where(e => e.NumberOfPolys == 1 && !e.HasPoint(previous) )
+                        .OrderBy(e => emptyOnRight ? AngleCW(currentEdge, e) : AngleCCW(currentEdge, e))
                         .FirstOrDefault();
-                
+          
                 if (nextEdge == null) return null;
                 return nextEdge.PointThatIsNot(current);
 
@@ -831,6 +964,9 @@ namespace RikusGameDevToolbox.Geometry2d
                 Vector2 toVector = to.PointThatIsNot(commonPoint).Position - commonPoint.Position;
                 return fromVector.AngleClockwise(toVector);
             }
+            
+            float AngleCCW(Edge from, Edge to) => 360f - AngleCW(from, to);
+           
             
      
         }
@@ -857,7 +993,7 @@ namespace RikusGameDevToolbox.Geometry2d
             foreach (Point point in pointsInArea) 
             {
                 if (point == edgePoint1 || point == edgePoint2) continue;
-                if (IsPointOnEdge(point.Position, edgePoint1.Position, edgePoint2.Position, epsilon))
+                if (PolygonTools.IsPointOnEdge(point.Position, edgePoint1.Position, edgePoint2.Position, epsilon))
                 {
                     result.Add(point);
                 }
@@ -873,24 +1009,24 @@ namespace RikusGameDevToolbox.Geometry2d
             }
         }
 
-        private bool IsPointOnEdge(Vector2 point, Vector2 edgeStart, Vector2 edgeEnd, float epsilon)
+        // Very crude implementation
+        // Should return all edges that go through the rect but also many that don't.
+        private List<Edge> EdgesNear(Rect rect)
         {
-            return IsInBoundingBox(point, edgeStart, edgeEnd) &&
-                   DistanceFromLine(point, edgeStart, edgeEnd) < epsilon;
-
-            bool IsInBoundingBox(Vector2 p, Vector2 a, Vector2 b)
+            Rect searchArea = rect.Grow(_longestEdgeLength*2f);
+            List<Edge> result = new();
+            foreach (var point in _points.ItemsInRectangle(searchArea))
             {
-                return Mathf.Min(a.x, b.x) <= p.x && p.x <= Mathf.Max(a.x, b.x) &&
-                       Mathf.Min(a.y, b.y) <= p.y && p.y <= Mathf.Max(a.y, b.y);
+                foreach (var edge in point.Edges)
+                {
+                    result.Add(edge);
+                }
             }
 
-            float DistanceFromLine(Vector2 p, Vector2 a, Vector2 b)
-            {
-                Vector2 rejection = (p - a).RejectionOn(b - a);
-                return rejection.magnitude;
-            }
+            return result;
         }
-        
+
+
 
         #endregion
     }

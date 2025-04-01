@@ -4,7 +4,7 @@ using UnityEngine.Windows.WebCam;
 
 namespace RikusGameDevToolbox.VectorGraphics
 {
-    public static class Geometry 
+    internal static class Geometry 
     {
         public static List<Vector3> GearToothConical(float addendum, float dedendum)
         {

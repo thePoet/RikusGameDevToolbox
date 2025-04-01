@@ -134,6 +134,32 @@ namespace RikusGameDevToolbox.Geometry2d
             }
         }
          
+         /// <summary>
+         /// Returns true if point is within the given distance from a line segment.
+         /// </summary>
+         /// <param name="point"></param>
+         /// <param name="edgeStart"></param>
+         /// <param name="edgeEnd"></param>
+         /// <param name="epsilon"></param>
+         /// <returns></returns>
+        public static bool IsPointOnEdge(Vector2 point, Vector2 edgeStart, Vector2 edgeEnd, float epsilon)
+        {
+            return IsPointsProjectionOnEdge(point, edgeStart, edgeEnd) &&
+                   PointsDistanceFromLine(point, edgeStart, edgeEnd) < epsilon;
+            
+            bool IsPointsProjectionOnEdge(Vector2 p, Vector2 a, Vector2 b)
+            {
+                float dotProduct = Vector2.Dot(p - a, b - a);
+                return dotProduct >= 0 && dotProduct <= (b-a).sqrMagnitude;
+            }
+
+            float PointsDistanceFromLine(Vector2 p, Vector2 a, Vector2 b)
+            {
+                Vector2 rejection = (p - a).RejectionOn(b - a);
+                return rejection.magnitude;
+            }
+        }
+         
         internal static List<Polygon> ToPolygons(PolyTreeD tree)
         {
             var result = new List<Polygon>();
@@ -172,7 +198,15 @@ namespace RikusGameDevToolbox.Geometry2d
             
         }
 
-         
+        internal static PolyTreeD ToPolyTree(PathsD paths)
+        {
+            PolyTreeD polytree = new();
+            ClipperD clipper = new();
+            clipper.AddSubject(paths);
+            clipper.Execute(ClipType.Union, FillRule.NonZero, polytree);
+            return polytree;
+        }
+
         private static List<OutlineIntersection> OutlineIntersections(SimplePolygon a, SimplePolygon b)
         {
             List<OutlineIntersection> intersections = new List<OutlineIntersection>();
@@ -226,6 +260,8 @@ namespace RikusGameDevToolbox.Geometry2d
                 yield return i == polygon.Contour.Length - 1 ? (i, 0) : (i, i + 1);
             }
         }
+        
+        
 
     }
 }

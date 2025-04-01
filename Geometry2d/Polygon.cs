@@ -14,9 +14,27 @@ namespace RikusGameDevToolbox.Geometry2d
     {
         internal PathsD Paths;
         
+        public static List<Polygon> CreateFromOutlines(IEnumerable<IEnumerable<Vector2>> outlines)
+        {
+           var paths = new PathsD();
+           paths.AddRange(outlines.Select(ToPathD));
+           PolyTreeD polyTree = PolygonTools.ToPolyTree(paths);
+           return PolygonTools.ToPolygons(polyTree);
+        }
+        
         /// Points in the outline of the polygon in CCW order.
         public Vector2[] Contour => Paths[0].Select(p => new Vector2((float)p.x, (float)p.y)).ToArray();
      
+        public int NumHoles => Mathf.Max(0, Paths.Count - 1);
+
+        public SimplePolygon Hole(int holeIndex)
+        {
+            if (holeIndex < 0 || holeIndex >= NumHoles) return null;
+            PathD path = new PathD(Paths[holeIndex + 1]);
+            path.Reverse();
+            return new SimplePolygon(path);
+        }
+        
         public float Area => (float)Clipper.Area(Paths);
 
         /// <summary>
@@ -110,6 +128,17 @@ namespace RikusGameDevToolbox.Geometry2d
             }
         }
 
+        protected static PointD ToPointD(Vector2 point) => new (point.x, point.y);
+        
+        protected static PathD ToPathD(IEnumerable<Vector2> points) => new (points.Select(ToPointD));
+        
+        protected static Vector2 ToVector2(PointD point) => new ((float)point.x, (float)point.y);
+
+
+
+        
+        
+        #region ------------------------------------------ PRIVATE METHODS ----------------------------------------------
         private PointInPolygonResult PointInPolygon(Vector2 point)
         {
             var p = ToPointD(point);
@@ -137,12 +166,7 @@ namespace RikusGameDevToolbox.Geometry2d
             }
         }
 
-        
-        protected static PointD ToPointD(Vector2 point) => new (point.x, point.y);
-        
-        protected static PathD ToPathD(IEnumerable<Vector2> points) => new (points.Select(ToPointD));
-        
-        protected static Vector2 ToVector2(PointD point) => new ((float)point.x, (float)point.y);
+        #endregion
 
 
     }

@@ -120,6 +120,23 @@ public class TestSpatialCollections
         }
     }
 
+    
+    /*
+     * Adding 50000 items took 45.41016 ms
+       Doing 50000 searches took 205.5664 ms
+       Removing 50000 items took 24.6582 ms
+       
+       Adding 50000 items took 41.48102 ms
+       Doing 50000 searches took 141.6817 ms
+       Removing 50000 items took 22.39227 ms
+       
+       Adding 50000 items took 43.01262 ms
+       Doing 50000 searches took 150.0568 ms
+       Removing 50000 items took 23.46992 ms
+       
+       */
+    
+    
     [Test]
     public void Performance()
     {

@@ -1,5 +1,7 @@
 using System.Collections.Generic;
+using System.Linq;
 using Clipper2Lib;
+using UnityEngine;
 
 
 namespace RikusGameDevToolbox.Geometry2d
@@ -82,6 +84,57 @@ namespace RikusGameDevToolbox.Geometry2d
             return PolygonTools.ToPolygons(polytree);
         }
 
+        /// <summary>
+        /// If polygon has a point that lies on the edge of the other polygon, this inserts a mathing point to the
+        /// edge if one does not already exist.
+        /// Horribly inefficient, use only for small polygons!!!
+        /// </summary>
+        public static void MatchPoints(Polygon poly1, Polygon poly2, float tolerance)
+        {
+            MatchPaths(poly1.Paths, poly2.Paths);
+            MatchPaths(poly2.Paths, poly1.Paths);
+
+            void MatchPaths(PathsD a, PathsD b)
+            {
+                foreach (PathD aPath in a)
+                {
+                    foreach (var aPoint in aPath)
+                    {
+                        foreach (PathD bPath in b)
+                        {
+                            Match(aPoint, bPath);
+                        }
+                    }
+                }
+            }
+
+            void Match(PointD point, PathD path)
+            {
+                if (path.Any(dp => DistanceWithinTolerance(dp, point))) return;
+
+                for (int i = 0; i < path.Count; i++)
+                {
+                    PointD edge1 = path[i];
+                    int nextIndex = (i + 1) % path.Count;
+                    PointD edge2 = path[nextIndex];
+
+                    if (PolygonTools.IsPointOnEdge(ToVector2(point), ToVector2(edge1), ToVector2(edge2), tolerance))
+                    {
+                        path.Insert(nextIndex, point);
+                        break;
+                    }
+                }
+            }
+
+
+            bool DistanceWithinTolerance(PointD a, PointD b)
+            {
+                return Vector2.Distance(ToVector2(a), ToVector2(b)) <= tolerance;
+            }
+
+            Vector2 ToVector2(PointD point) => new((float)point.x, (float)point.y);
+        }
+        
         #endregion
     }
 }
