@@ -889,11 +889,9 @@ namespace RikusGameDevToolbox.Geometry2d
             // ---
             Outline ExtractOutline(Edge startEdge, HashSet<Edge> borderEdges)
             {
-                // Tämä juuttuu ja muisti loppuu joskus
-                
                 borderEdges.Remove(startEdge);
 
-                Point startPoint = startEdge.Point2;
+                Point startPoint = startEdge.Point1;
                 Point lastPoint = startEdge.Point1;
                 Point point = startEdge.Point2;
                 var outline = new Outline();
@@ -901,7 +899,6 @@ namespace RikusGameDevToolbox.Geometry2d
                 outline.points.Add(lastPoint);
                 outline.points.Add(point);
 
-                
                 
                 for (int i=0;i<10000;i++)
                 {
@@ -930,7 +927,6 @@ namespace RikusGameDevToolbox.Geometry2d
                         }
                         return outline;
                     }
-                    
 
                     outline.points.Add(point);
                 }

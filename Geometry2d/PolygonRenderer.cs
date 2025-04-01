@@ -1,4 +1,5 @@
 using System;
+using System.Linq;
 using UnityEngine;
 using RikusGameDevToolbox.VectorGraphics;
 using Random = UnityEngine.Random;
@@ -17,26 +18,41 @@ namespace RikusGameDevToolbox.Geometry2d
                 var edge = CreateEdge(a, b, 0 + .01f, Color.cyan);
                 edge.transform.parent = go.transform;
             }
-
+/*
             foreach (var (a,b)  in mesh.DebugBorderEdges())
             {
                 var edge = CreateEdge(a, b, lineWidth*2f, Color.red);
                 edge.transform.parent = go.transform;
-            }
-/*
+            }*/
+
             foreach (var outline in mesh.Outlines())
             {
+               
                 Vector2 previus = outline[outline.Count - 1];
                 foreach (Vector2 p in outline)
                 {
                     var edge = CreateEdge(previus, p, lineWidth*2f, Color.magenta);
                     edge.transform.parent = go.transform;
                     previus = p;
+
+
+                    var point = new GameObject();
+                    point.transform.position = p;
                 }
             }
             
             foreach (var hole in mesh.Holes())
             {
+                if (hole.Count < 20)
+                {
+                    string holeStr = "";
+                    foreach (var p in hole)
+                    {
+                        holeStr += p + ", ";
+                    }
+                    Debug.Log("Hole with less than 20 points: " + holeStr);
+                }
+                
                 Vector2 previus = hole[hole.Count - 1];
                 foreach (Vector2 p in hole)
                 {
@@ -44,7 +60,7 @@ namespace RikusGameDevToolbox.Geometry2d
                     edge.transform.parent = go.transform;
                     previus = p;
                 }
-            }*/
+            }
             return go;
         }
         
