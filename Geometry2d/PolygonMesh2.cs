@@ -1,5 +1,4 @@
 using System;
-using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
 using RikusGameDevToolbox.GeneralUse;
@@ -133,6 +132,8 @@ namespace RikusGameDevToolbox.Geometry2d
         public List<Guid> PolygonIds() => _polys.Keys.ToList();
 
         public List<(Guid, SimplePolygon)> Polygons() => _polys.Select(kvp => (kvp.Key, kvp.Value.AsSimplePolygon())).ToList();
+        
+        public SimplePolygon Polygon(Guid id) => _polys[id].AsSimplePolygon();
 
         public List<List<Vector2>> Outlines()
         {
@@ -163,6 +164,8 @@ namespace RikusGameDevToolbox.Geometry2d
             _outlinesAreUpToDate = false;
             return poly.Id;
         }
+
+   
         
         public Guid AddPolygonAndFuseVertices(SimplePolygon shape, float tolerance, bool fuseToEdges=false)
         {
@@ -313,19 +316,16 @@ namespace RikusGameDevToolbox.Geometry2d
         /// <summary>
         /// Returns the shape of the whole mesh
         /// </summary>
-        public List<Polygon> Shape()
-        {
-            return Polygon.CreateFromOutlines(_outlines
-                .Select(o => o.points.Select(p => p.Position)));
-        }
+        //public List<Polygon> Shape()
+      //  {
+//            return Polygon.CreateFromOutlines(_outlines)
+  //              .Select(o => o.points.Select(p => p.Position)));
+    //    }
         
         
         public List<PolygonMesh2> DetachDisconnectedAreas()
         {
-            float tolerance = 0.01f; // TODO: remove magic number
-            
             if (!_outlinesAreUpToDate) UpdateOutlines();
-
 
             var outlines = _outlines.Where(o =>  !o.isHole)
                 .OrderByDescending(o => o.points.Count).ToList();
@@ -413,16 +413,16 @@ namespace RikusGameDevToolbox.Geometry2d
 
             return newMesh;
 
-            HashSet<Point> PointsToCopy(List<Guid> polyIdsToCopy)
+            IEnumerable<Point> PointsToCopy(List<Guid> polyIdsToCopy)
             {
-                if (polyIdsToCopy==null) return _points.ToHashSet();
-                return polyIdsToCopy.SelectMany(id => _polys[id].Points).ToHashSet();
+                if (polyIdsToCopy==null) return _points;
+                return polyIdsToCopy.SelectMany(id => _polys[id].Points).Distinct();
             }
             
-            HashSet<Edge> EdgesToCopy(List<Guid> polyIdsToCopy)
+            IEnumerable<Edge> EdgesToCopy(List<Guid> polyIdsToCopy)
             {
-                if (polyIdsToCopy==null) return _edges.ToHashSet();
-                return polyIdsToCopy.SelectMany(id => _polys[id].Edges()).ToHashSet();
+                if (polyIdsToCopy==null) return _edges;
+                return polyIdsToCopy.SelectMany(id => _polys[id].Edges()).Distinct();
             }
             
         
