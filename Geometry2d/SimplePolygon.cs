@@ -160,22 +160,22 @@ namespace RikusGameDevToolbox.Geometry2d
 
         internal SimplePolygon(PathD path)
         {
-            if (!Clipper.IsPositive(path))
+            if (PathUtils.IsClockwise(path))
             {
                  Debug.LogError("Wrong winding order for creating SimplePolygon from pathD.");
             }
             // make copy of path
             PathD pathCopy = new PathD(path);
-            Paths = new PathsD { pathCopy };
+            PathsD = new PathsD { pathCopy };
         }
         #endregion
         #region ------------------------------------------ PRIVATE METHODS ----------------------------------------------
       
         private void SetPoints(IEnumerable<Vector2> points)
         {
-            var path = ToPathD(points);
-            if (!Clipper.IsPositive(path)) throw new ArgumentException("Polygon's points must be given in counter-clockwise order.");
-            Paths = new PathsD { path };
+            var path = PathUtils.ToPathD(points);
+            if (PathUtils.IsClockwise(path)) throw new ArgumentException("Polygon's points must be given in counter-clockwise order.");
+            PathsD = new PathsD { path };
         }
         #endregion
 

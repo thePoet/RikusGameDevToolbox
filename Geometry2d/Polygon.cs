@@ -12,30 +12,28 @@ namespace RikusGameDevToolbox.Geometry2d
     /// </summary>
     public abstract class Polygon
     {
-        internal PathsD Paths;
+        internal PathsD PathsD;
         
         public static List<Polygon> CreateFromOutlines(IEnumerable<IEnumerable<Vector2>> outlines)
         {
            var paths = new PathsD();
-           paths.AddRange(outlines.Select(ToPathD));
+           paths.AddRange(outlines.Select(PathUtils.ToPathD));
            PolyTreeD polyTree = PolygonTools.ToPolyTree(paths);
            return PolygonTools.ToPolygons(polyTree);
         }
         
         /// Points in the outline of the polygon in CCW order.
-        public Vector2[] Contour => Paths[0].Select(p => new Vector2((float)p.x, (float)p.y)).ToArray();
-     
-        public int NumHoles => Mathf.Max(0, Paths.Count - 1);
-
-        public SimplePolygon Hole(int holeIndex)
-        {
-            if (holeIndex < 0 || holeIndex >= NumHoles) return null;
-            PathD path = new PathD(Paths[holeIndex + 1]);
-            path.Reverse();
-            return new SimplePolygon(path);
-        }
+        public Vector2[] Contour => PathUtils.ToVector2Array(PathsD[0]);
         
-        public float Area => (float)Clipper.Area(Paths);
+  
+        /// <summary>
+        /// Return the paths of the polygon. The first is the outline/contour of the polygon (in CCW order) and the rest are
+        /// the holes (in CW order).
+        /// </summary>
+        public Vector2[][] Paths => PathsD.Select(PathUtils.ToVector2Array).ToArray();
+        
+
+        public float Area => (float)Clipper.Area(PathsD);
 
         /// <summary>
         /// Is the point inside the polygon but not inside it's holes or on it's edges?
@@ -56,13 +54,13 @@ namespace RikusGameDevToolbox.Geometry2d
         {
             foreach ((int a, int b) in PointIndicesForEdges())
             {
-                yield return new Edge(ToVector2(Paths[0][a]), ToVector2(Paths[0][b]));
+                yield return new Edge(ToVector2(PathsD[0][a]), ToVector2(PathsD[0][b]));
             }
         }
         
         public void Simplify(float tolerance)
         {
-            Paths = Clipper.SimplifyPaths(Paths, tolerance);
+            PathsD = Clipper.SimplifyPaths(PathsD, tolerance);
         }
         
         /// <summary>
@@ -76,7 +74,7 @@ namespace RikusGameDevToolbox.Geometry2d
         
         public SimplePolygon DiscardHoles()
         {
-            return new SimplePolygon(Paths[0]);
+            return new SimplePolygon(PathsD[0]);
         }
 
         /// <summary>
@@ -90,7 +88,7 @@ namespace RikusGameDevToolbox.Geometry2d
         {
             JoinType joinType = JoinType.Miter;
             if (roundedCorners) joinType = JoinType.Round;
-            PathsD paths= Clipper.InflatePaths(Paths, amount, joinType, EndType.Polygon);
+            PathsD paths= Clipper.InflatePaths(PathsD, amount, joinType, EndType.Polygon);
           
             PolyTreeD polytree = new();
             ClipperD clipper = new();
@@ -110,7 +108,7 @@ namespace RikusGameDevToolbox.Geometry2d
         
         public override string ToString()
         {
-            return $"Polygon with {Paths.Count} paths. \n{string.Join("\n", Paths.Select(PathAsString))}\n";
+            return $"Polygon with {PathsD.Count} paths. \n{string.Join("\n", PathsD.Select(PathAsString))}\n";
             
             String PathAsString(PathD path) => string.Join(", ", path.Select(p => $"({p.x}, {p.y})"));
         }
@@ -119,18 +117,16 @@ namespace RikusGameDevToolbox.Geometry2d
         {
             Gizmos.color = Color.green;
 
-            for (int pathIndex=0; pathIndex < Paths.Count; pathIndex++)
+            for (int pathIndex=0; pathIndex < PathsD.Count; pathIndex++)
             {
                 foreach ((int a, int b) in PointIndicesForEdges(pathIndex))
                 {
-                    Gizmos.DrawLine(ToVector2(Paths[0][a]), ToVector2(Paths[0][b]));
+                    Gizmos.DrawLine(ToVector2(PathsD[0][a]), ToVector2(PathsD[0][b]));
                 }
             }
         }
 
         protected static PointD ToPointD(Vector2 point) => new (point.x, point.y);
-        
-        protected static PathD ToPathD(IEnumerable<Vector2> points) => new (points.Select(ToPointD));
         
         protected static Vector2 ToVector2(PointD point) => new ((float)point.x, (float)point.y);
 
@@ -142,14 +138,14 @@ namespace RikusGameDevToolbox.Geometry2d
         private PointInPolygonResult PointInPolygon(Vector2 point)
         {
             var p = ToPointD(point);
-            var r = Clipper.PointInPolygon(ToPointD(point), Paths[0]);
+            var r = Clipper.PointInPolygon(ToPointD(point), PathsD[0]);
             if (r!=PointInPolygonResult.IsInside) return r;
             
             // Holes:
-            for (int i=1; i<Paths.Count; i++)
+            for (int i=1; i<PathsD.Count; i++)
             {
-                if (Clipper.PointInPolygon(p, Paths[i]) is PointInPolygonResult.IsInside) return PointInPolygonResult.IsOutside;
-                if (Clipper.PointInPolygon(p, Paths[i]) is PointInPolygonResult.IsOn) return PointInPolygonResult.IsOn;
+                if (Clipper.PointInPolygon(p, PathsD[i]) is PointInPolygonResult.IsInside) return PointInPolygonResult.IsOutside;
+                if (Clipper.PointInPolygon(p, PathsD[i]) is PointInPolygonResult.IsOn) return PointInPolygonResult.IsOn;
             }
             return PointInPolygonResult.IsInside;
             
@@ -160,9 +156,9 @@ namespace RikusGameDevToolbox.Geometry2d
         // where n is the number of edges in the polygon.
         private IEnumerable<(int, int)> PointIndicesForEdges(int pathIndex = 0)
         {
-            for (int i = 0; i < Paths[pathIndex].Count; i++)
+            for (int i = 0; i < PathsD[pathIndex].Count; i++)
             {
-                yield return i == Paths[pathIndex].Count - 1 ? (i, 0) : (i, i + 1);
+                yield return i == PathsD[pathIndex].Count - 1 ? (i, 0) : (i, i + 1);
             }
         }
 

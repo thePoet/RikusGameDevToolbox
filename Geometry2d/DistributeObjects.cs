@@ -18,8 +18,7 @@ namespace RikusGameDevToolbox.Geometry2d
         /// <param name="existingPoints">Already existing positions. Note that these are not included in the result.</param>
         public static List<Vector2> InRectangle(Rect area, float minSpacing, IEnumerable<Vector2> existingPoints = null)
         {
-            Vector2 RandomPointInRect() => new Vector2(Random.Range(area.xMin, area.xMax),
-                Random.Range(area.yMin, area.yMax));
+            Vector2 RandomPointInRect() => new (Random.Range(area.xMin, area.xMax), Random.Range(area.yMin, area.yMax));
             bool IsInArea(Vector2 position) => area.Contains(position);
             return Poisson(RandomPointInRect, minSpacing, IsInArea, existingPoints);
         }
@@ -49,17 +48,21 @@ namespace RikusGameDevToolbox.Geometry2d
         /// <param name="existingPoints">Already existing positions. Note that these are not included in the result.</param>
         public static List<Vector2> InPolygon(Polygon polygon, float minSpacing, IEnumerable<Vector2> existingPoints = null)
         {
+            float t = Time.realtimeSinceStartup;
             // TODO: the random function is not very good if polygon is small compared to it's bounding box
             // TODO: Also it is weirdly slow
             Vector2 RandomPoint() => polygon.Bounds().RandomPointInside();
             bool IsInside(Vector2 position) => polygon.IsPointInside(position);
-            return Poisson(RandomPoint, minSpacing, IsInside, existingPoints);
+            var result =  Poisson(RandomPoint, minSpacing, IsInside, existingPoints);
+            Debug.Log("POisson took : " + (Time.realtimeSinceStartup - t)*1000f + " ms");
+           // var result =  InRectangle(polygon.Bounds(), minSpacing,existingPoints).Where(polygon.IsPointInside).ToList();
+            return result;
         }
 
 
         // Poisson disk sampling algorithm based on: http://devmag.org.za/2009/05/03/poisson-disk-sampling/
         private static List<Vector2> Poisson(Func<Vector2> randomPoint, float minSpacing, Func<Vector2, bool> isInArea,
-        IEnumerable<Vector2> existingPoints = null, int numTriesToGeneratePoint = 50)
+        IEnumerable<Vector2> existingPoints = null, int numTriesToGeneratePoint = 40)
         {
             float cellSize = minSpacing / Mathf.Sqrt(2);
             Dictionary<(int, int), Vector2> grid = new();

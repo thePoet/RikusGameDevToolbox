@@ -9,7 +9,7 @@ namespace RikusGameDevToolbox.Geometry2d
     public static class PolygonRenderer
     {
 
-        public static GameObject Render(PolygonMesh2 mesh, float lineWidth)
+        public static GameObject Render(PolygonMesh mesh, float lineWidth)
         {
             GameObject go = new GameObject("PolygonMesh");
 
@@ -78,28 +78,20 @@ namespace RikusGameDevToolbox.Geometry2d
             
             lr.loop = true;
             lr.positionCount = polygon.Contour.Length;
-      
-            for (int i=0; i<polygon.Contour.Length; i++)
+
+
+            foreach (Vector2[] path in polygon.Paths)
             {
-                lr.SetPosition(i, polygon.Contour[i]);
-                var point = CreatePoint(polygon.Contour[i], pointSize,  color);
-                point.transform.parent = go.transform;
-                point.transform.localEulerAngles = new Vector3(0, 0, rotation);
-            }
-            
-            for (int holeIdx=0; holeIdx < polygon.NumHoles; holeIdx++)
-            {
-                var hole = polygon.Hole(holeIdx);
-                GameObject h = new GameObject("PolygonHole");
+                GameObject h = new GameObject("PolygonPath");
                 var lr2 = h.AddComponent<LineRenderer>();
                 Setup(lr2, lineWidth, color);
                 lr2.loop = true;
-                lr2.positionCount = hole.Contour.Length;
+                lr2.positionCount = path.Length;
                 
-                for (int i=0; i<hole.Contour.Length; i++)
+                for (int i=0; i<path.Length; i++)
                 {
-                    lr2.SetPosition(i, hole.Contour[i]);
-                    var point = CreatePoint(hole.Contour[i], pointSize,  color);
+                    lr2.SetPosition(i, path[i]);
+                    var point = CreatePoint(path[i], pointSize,  color);
                     point.transform.parent = h.transform;
                     point.transform.localEulerAngles = new Vector3(0, 0, rotation);
                 }

@@ -49,7 +49,7 @@ public class TestsPolygonMesh
     [Test]
     public void AddingPolygons()
     {
-        var mesh = new PolygonMesh2();
+        var mesh = new PolygonMesh();
 
         mesh.AddPolygon(_a);
         Assert.IsTrue(mesh.Edges().Count == 4);
@@ -67,7 +67,7 @@ public class TestsPolygonMesh
     {
         SimplePolygon a = new SimplePolygon(new Vector2[] { new(0, 0), new(10, 0), new(10, 10), new(0, 10) });
         SimplePolygon b = new SimplePolygon(new Vector2[] { new(0, 10), new(0, 12), new(-1, 12) });
-        var mesh = new PolygonMesh2();
+        var mesh = new PolygonMesh();
         mesh.AddPolygon(a);
         mesh.AddPolygon(b);
         Assert.IsTrue(mesh.Edges().Count == 7);
@@ -83,7 +83,7 @@ public class TestsPolygonMesh
     {
         SimplePolygon a = new SimplePolygon(new Vector2[] { new(0, 0), new(10, 0), new(10, 10), new(0, 10) });
         SimplePolygon b = new SimplePolygon(new Vector2[] { new(-5, -5), new(10, 0), new(0, 0) });
-        var mesh = new PolygonMesh2();
+        var mesh = new PolygonMesh();
 
         mesh.AddPolygon(a);
         mesh.AddPolygon(b);
@@ -110,7 +110,7 @@ public class TestsPolygonMesh
         SimplePolygon e = new SimplePolygon( points.Select(p=> p + new Vector2(-10,0)) );
         SimplePolygon f = new SimplePolygon( points.Select(p=> p + new Vector2(0,-10)) );
 
-        var mesh = new PolygonMesh2();
+        var mesh = new PolygonMesh();
 
         mesh.AddPolygon(b);
         mesh.AddPolygon(c);
@@ -148,7 +148,7 @@ public class TestsPolygonMesh
         SimplePolygon d = new SimplePolygon( new[] { p5,p6,p3,p4 } );
         
 
-        var mesh = new PolygonMesh2();
+        var mesh = new PolygonMesh();
 
         mesh.AddPolygon(a);
         mesh.AddPolygon(b);
@@ -170,7 +170,7 @@ public class TestsPolygonMesh
     [Test]
     public void SplittingEdges1()
     {
-        var mesh = new PolygonMesh2();
+        var mesh = new PolygonMesh();
         mesh.AddPolygon(_a);
         mesh.AddPolygon(_f);
         mesh.FuseVertices(0.001f, fuseToEdges:true);
@@ -183,7 +183,7 @@ public class TestsPolygonMesh
     [Test]
     public void SplittingEdges2()
     {
-        var mesh = new PolygonMesh2();
+        var mesh = new PolygonMesh();
         mesh.AddPolygon(_a);
         mesh.AddPolygon(_e);
         mesh.FuseVertices(0.001f, fuseToEdges:true);
@@ -200,7 +200,7 @@ public class TestsPolygonMesh
     [Test]
     public void SplittingEdges3()
     {
-        var mesh = new PolygonMesh2();
+        var mesh = new PolygonMesh();
         mesh.AddPolygon(_a);
         mesh.AddPolygon(_g);
         mesh.FuseVertices(0.001f, fuseToEdges:true);
@@ -215,7 +215,7 @@ public class TestsPolygonMesh
     [Test]
     public void RemovingPolygons1()
     {
-        var mesh = new PolygonMesh2();
+        var mesh = new PolygonMesh();
 
         Vector2[] points1 = { new(0, 0), new(10, 0), new(10, 10), new(0, 10) };
         Vector2[] points2 = { new(0, 0), new(5, -5), new(10, 0) };
@@ -244,7 +244,7 @@ public class TestsPolygonMesh
     [Test]
     public void RemovingPolygons2()
     {
-        var mesh = new PolygonMesh2();
+        var mesh = new PolygonMesh();
 
         Vector2[] points1 = { new(0, 0), new(10, 0), new(10, 10), new(0, 10) };
         Vector2[] points2 = { new(0, 0), new(5, -5), new(10, 0) };
@@ -280,7 +280,7 @@ public class TestsPolygonMesh
     [Test]
     public void CopyMesh()
     {
-        var mesh = new PolygonMesh2();
+        var mesh = new PolygonMesh();
 
         Vector2[] points1 = { new(0, 0), new(10, 0), new(10, 10), new(0, 10) };
         Vector2[] points2 = { new(0, 0), new(5, -5), new(10, 0) };
@@ -295,7 +295,7 @@ public class TestsPolygonMesh
         Assert.IsTrue(mesh.PolygonIds().Count == 3);
 
 
-        PolygonMesh2 mesh2 = mesh.MakeCopy();
+        PolygonMesh mesh2 = mesh.MakeCopy();
         IntegrityTest(mesh2);
         Assert.IsTrue(mesh2.Edges().Count == 8);
         Assert.IsTrue(mesh2.Points().Count == 6);
@@ -303,7 +303,7 @@ public class TestsPolygonMesh
         Assert.IsTrue(!mesh2.PolygonIds().Contains(poly1));
         Assert.IsTrue(!mesh2.PolygonIds().Contains(poly2));
         Assert.IsTrue(!mesh2.PolygonIds().Contains(poly3));
-        PolygonMesh2 mesh3 = mesh.MakeCopy(preservePolygonIds:true);
+        PolygonMesh mesh3 = mesh.MakeCopy(preservePolygonIds:true);
         Assert.IsTrue(mesh3.PolygonIds().Contains(poly1));
         Assert.IsTrue(mesh3.PolygonIds().Contains(poly2));
         Assert.IsTrue(mesh3.PolygonIds().Contains(poly3));
@@ -313,7 +313,7 @@ public class TestsPolygonMesh
     [Test]
     public void PartialCopyMesh()
     {
-        var mesh = new PolygonMesh2();
+        var mesh = new PolygonMesh();
 
         Vector2[] points1 = { new(0, 0), new(10, 0), new(10, 10), new(0, 10) };
         Vector2[] points2 = { new(0, 0), new(5, -5), new(10, 0) };
@@ -328,7 +328,7 @@ public class TestsPolygonMesh
         Assert.IsTrue(mesh.PolygonIds().Count == 3);
 
 
-        PolygonMesh2 mesh2 = mesh.MakeCopy(true, new List<Guid>(){poly2, poly3});
+        PolygonMesh mesh2 = mesh.MakeCopy(true, new List<Guid>(){poly2, poly3});
         IntegrityTest(mesh2);
         Assert.IsTrue(mesh2.Edges().Count == 6);
         Assert.IsTrue(mesh2.Points().Count == 5);
@@ -356,7 +356,7 @@ public class TestsPolygonMesh
             }
         }
         
-        var mesh = new PolygonMesh2();
+        var mesh = new PolygonMesh();
 
         float t1, t2;
 
@@ -398,7 +398,7 @@ public class TestsPolygonMesh
         return Vector2.Distance(a, b) < 0.0001f;
     }
     
-    private static void IntegrityTest(PolygonMesh2 mesh)
+    private static void IntegrityTest(PolygonMesh mesh)
     {
         var result = mesh.TestForIntegrity();
         if (result.message != "") Debug.Log("INTEGRITY FAILED\n" + result.message);

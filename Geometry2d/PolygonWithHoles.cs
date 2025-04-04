@@ -10,10 +10,10 @@ namespace RikusGameDevToolbox.Geometry2d
     public class PolygonWithHoles : Polygon
     {
         
-        internal PolygonWithHoles(PathsD paths)
+        internal PolygonWithHoles(PathsD pathsD)
         {
-            int numOutlines = paths.Count(Clipper.IsPositive);
-            int numHoles = paths.Count(path => !Clipper.IsPositive(path));
+            int numOutlines = pathsD.Count(Clipper.IsPositive);
+            int numHoles = pathsD.Count(path => !Clipper.IsPositive(path));
             
             if (numOutlines != 1 || numHoles < 1)
             {
@@ -22,8 +22,8 @@ namespace RikusGameDevToolbox.Geometry2d
             
             //NOTE: We don't check if the holes are inside the outline
             
-            ArrangePathsContourFirst(paths);   // Is this necessary or is contour always first?
-            Paths = paths;
+            ArrangePathsContourFirst(pathsD);   // Is this necessary or is contour always first?
+            PathsD = pathsD;
             
        
             void ArrangePathsContourFirst(PathsD paths)
