@@ -14,7 +14,7 @@ namespace RikusGameDevToolbox.Geometry2d
     {
         internal PathsD PathsD;
         
-        public static List<Polygon> CreateFromOutlines(IEnumerable<IEnumerable<Vector2>> outlines)
+        public static List<Polygon> CreateFromPaths(IEnumerable<IEnumerable<Vector2>> outlines)
         {
            var paths = new PathsD();
            paths.AddRange(outlines.Select(PathUtils.ToPathD));
