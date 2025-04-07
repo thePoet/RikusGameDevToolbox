@@ -215,12 +215,13 @@ namespace RikusGameDevToolbox.Geometry2d
             {
                 foreach ((int b1, int b2) in PointIndicesForEdges(b))
                 {
-                    var result = Math2d.LineSegmentIntersection(a.Contour[a1], a.Contour[a2], b.Contour[b1], b.Contour[b2]);
-                    if (result.AreIntersecting)
-                    {
+                    Vector2? intersection =
+                        Intersection.LineSegmentPosition(a.Contour[a1], a.Contour[a2], b.Contour[b1], b.Contour[b2]);
+                    if (intersection.HasValue)
+                    {   
                         intersections.Add(new OutlineIntersection
                         {
-                            IntersectionPosition = result.intersectionPoint,
+                            IntersectionPosition = intersection.Value,
                             PointIdx1 = a1,
                             PointIdx2 = a2,
                             IsStartOfIntersectingArea = Math2d.IsPointLeftOfLine(b.Contour[b1], a.Contour[a1], a.Contour[a2])

@@ -54,7 +54,6 @@ namespace RikusGameDevToolbox.Geometry2d
             Vector2 RandomPoint() => polygon.Bounds().RandomPointInside();
             bool IsInside(Vector2 position) => polygon.IsPointInside(position);
             var result =  Poisson(RandomPoint, minSpacing, IsInside, existingPoints);
-            Debug.Log("POisson took : " + (Time.realtimeSinceStartup - t)*1000f + " ms");
            // var result =  InRectangle(polygon.Bounds(), minSpacing,existingPoints).Where(polygon.IsPointInside).ToList();
             return result;
         }

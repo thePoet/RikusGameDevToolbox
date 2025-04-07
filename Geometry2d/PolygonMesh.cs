@@ -184,10 +184,11 @@ namespace RikusGameDevToolbox.Geometry2d
             HashSet<Point> points = new(poly.Points);
             FusePoints(points, tolerance);
             
-            /*
+            
             if (!fuseToEdges) return poly.Id;
 
-            
+            throw new NotImplementedException("Fuse to edges not implemented yet.");
+            /*
             HashSet<Point> newPoints = new();
             var edgePoints = InsertPointsOnEdgesWherePointsAlreadyExist(poly.Edges(), tolerance);
             newPoints.UnionWith(edgePoints);
@@ -531,6 +532,30 @@ namespace RikusGameDevToolbox.Geometry2d
 
         #endregion
 
+        #region ------------------------------------------ INTERNAL METHODS ----------------------------------------------
+
+        internal bool AreIntersecting(Guid polygonA, Guid polygonB)
+        {
+            var a = _polys[polygonA];
+            var b = _polys[polygonB];
+            foreach (var edgeA in a.Edges())
+            {
+                foreach (var edgeB in b.Edges())
+                {
+                    
+                    if (edgeA.HasPoint(edgeB.Point1) || edgeA.HasPoint(edgeB.Point2)) continue;
+                    if (Intersection.LineSegments(edgeA.Point1.Position, edgeA.Point2.Position,
+                            edgeB.Point1.Position, edgeB.Point2.Position))
+                    {
+                        return true;
+                    }
+                }
+            }
+            return false;
+        }
+
+        #endregion
+        
         #region ------------------------------------------ PRIVATE METHODS ----------------------------------------------
 
         private Poly CreatePolygon(SimplePolygon simplePolygon)
