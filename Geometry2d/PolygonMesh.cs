@@ -1,15 +1,21 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+
 using RikusGameDevToolbox.GeneralUse;
 using UnityEngine;
 
 
 namespace RikusGameDevToolbox.Geometry2d
 {
+
+    public record PolygonId(Guid Value);
+
+
+
     public class PolygonMesh
     {
-        private class Point
+        protected class Point
         {
             public Vector2 Position;
             public readonly HashSet<Edge> Edges = new();
@@ -32,7 +38,7 @@ namespace RikusGameDevToolbox.Geometry2d
             internal string ShortHash => "[" + Math.Abs(GetHashCode()) % 999 + "]";
         }
 
-        private class Edge
+        protected class Edge
         {
             public Point Point1;
             public Point Point2;
@@ -74,14 +80,12 @@ namespace RikusGameDevToolbox.Geometry2d
                                                  + " Right: " + (RightPoly == null ? "null" : RightPoly.ShortHash);
         }
 
-        private class Poly
+        protected class Poly
         {
-            public Guid Id;
+            public PolygonId Id;
             public List<Point> Points = new(); // CCW order
             public SimplePolygon AsSimplePolygon() => new(Points.Select(p => p.Position).ToArray());
-
-            public bool traversed = false;
-
+            
             public IEnumerable<Edge> Edges()
             {
                 foreach (var (point1, point2) in AsLoopingPairs(Points))
@@ -108,9 +112,9 @@ namespace RikusGameDevToolbox.Geometry2d
         #region --------------------------------------------- FIELDS ---------------------------------------------------
 
         private bool _outlinesAreUpToDate = false;
-        private readonly SpatialCollection2d<Point> _points = new();
+        private SpatialCollection2d<Point> _points = new();
         private readonly HashSet<Edge> _edges = new();
-        private readonly Dictionary<Guid, Poly> _polys = new();
+        protected readonly Dictionary<PolygonId, Poly> _polys = new();
         private List<Outline> _outlines = new();
         private float _longestEdgeLength = 0f;
 
@@ -127,14 +131,14 @@ namespace RikusGameDevToolbox.Geometry2d
 
         public List<SimplePolygon> PolygonShapes() => _polys.Values.Select(p => p.AsSimplePolygon()).ToList();
 
-        public List<Guid> PolygonIds() => _polys.Keys.ToList();
+        public List<PolygonId> PolygonIds() => _polys.Keys.ToList();
 
-        public List<(Guid, SimplePolygon)> Polygons() =>
+        public List<(PolygonId, SimplePolygon)> Polygons() =>
             _polys.Select(kvp => (kvp.Key, kvp.Value.AsSimplePolygon())).ToList();
 
-        public SimplePolygon Polygon(Guid id) => _polys[id].AsSimplePolygon();
+        public SimplePolygon Polygon(PolygonId id) => _polys[id].AsSimplePolygon();
 
-        public bool HasPolygon(Guid id) => _polys.ContainsKey(id);
+        public bool HasPolygon(PolygonId id) => _polys.ContainsKey(id);
 
         public List<List<Vector2>> Paths()
         {
@@ -163,10 +167,10 @@ namespace RikusGameDevToolbox.Geometry2d
 
         public int NumPolygons => _polys.Count;
 
-        public Guid AddPolygon(SimplePolygon shape)
+        public PolygonId AddPolygon(SimplePolygon shape)
         {
             Poly poly = CreatePolygon(shape);
-            poly.Id = Guid.NewGuid();
+            poly.Id = new PolygonId(Guid.NewGuid());
             _polys.Add(poly.Id, poly);
             _outlinesAreUpToDate = false;
             return poly.Id;
@@ -174,10 +178,10 @@ namespace RikusGameDevToolbox.Geometry2d
 
 
 
-        public Guid AddPolygonAndFuseVertices(SimplePolygon shape, float tolerance, bool fuseToEdges = false)
+        public PolygonId AddPolygonAndFuseVertices(SimplePolygon shape, float tolerance, bool fuseToEdges = false)
         {
             Poly poly = CreatePolygon(shape);
-            poly.Id = Guid.NewGuid();
+            poly.Id = new PolygonId(Guid.NewGuid());
             _polys.Add(poly.Id, poly);
             _outlinesAreUpToDate = false;
 
@@ -222,7 +226,7 @@ namespace RikusGameDevToolbox.Geometry2d
             }
         }
 
-        public void ChangeShapeOfPolygon(Guid id, SimplePolygon newShape)
+        public void ChangeShapeOfPolygon(PolygonId id, SimplePolygon newShape)
         {
             RemoveGeometry(id);
             try
@@ -239,16 +243,16 @@ namespace RikusGameDevToolbox.Geometry2d
             _outlinesAreUpToDate = false;
         }
 
-        public void RemovePolygon(Guid id)
+        public void RemovePolygon(PolygonId id)
         {
             RemoveGeometry(id);
             _polys.Remove(id);
             _outlinesAreUpToDate = false;
         }
 
-        public HashSet<Guid> Neighbours(Guid id)
+        public HashSet<PolygonId> Neighbours(PolygonId id)
         {
-            HashSet<Guid> result = new();
+            HashSet<PolygonId> result = new();
             var poly = _polys[id];
             foreach (var edge in poly.Edges())
             {
@@ -310,20 +314,21 @@ namespace RikusGameDevToolbox.Geometry2d
 
         public void TransformPoints(Func<Vector2, Vector2> transformFunction)
         {
-            foreach (var point in _points)
+            SpatialCollection2d<Point> newPoints = new();
+            
+            foreach (Point point in _points)
             {
                 point.Position = transformFunction(point.Position);
+                newPoints.Add(point.Position, point);
             }
+
+            _points = newPoints;
 
             _outlinesAreUpToDate = false;
         }
 
 
-        public bool PolygonAt(Vector2 position, out Guid id)
-        {
-            throw new NotImplementedException();
-        }
-
+   
         public int NumberOfSeparateAreas()
         {
             if (!_outlinesAreUpToDate) UpdateOutlines();
@@ -351,8 +356,8 @@ namespace RikusGameDevToolbox.Geometry2d
             for (int i = 1; i < outlines.Count; i++)
             {
                 Poly firstPoly = SomePolygonInsideOutline(outlines[i]);
-                List<Guid> polygonIds = PolygonsConnectedTo(firstPoly).Select(p => p.Id).ToList();
-                result.Add(MakeCopy(preservePolygonIds: true, polygonIds));
+                List<PolygonId> polygonIds = PolygonsConnectedTo(firstPoly).Select(p => p.Id).ToList();
+                result.Add(MakeCopy(preservePolygonIds:true, polygonIds));
                 foreach (var id in polygonIds)
                 {
                     RemovePolygon(id);
@@ -381,7 +386,7 @@ namespace RikusGameDevToolbox.Geometry2d
         /// Makes a deep copy of the mesh.
         /// </summary>
         /// <param name="preservePolygonIds">If false new ids are assigned at random.</param>
-        public PolygonMesh MakeCopy(bool preservePolygonIds = false, List<Guid> polygonIdsToCopy = null)
+        public PolygonMesh MakeCopy(bool preservePolygonIds = false, List<PolygonId> polygonIdsToCopy = null)
         {
 
 
@@ -405,7 +410,7 @@ namespace RikusGameDevToolbox.Geometry2d
             {
                 var newPoly = new Poly
                 {
-                    Id = preservePolygonIds ? id : Guid.NewGuid()
+                    Id = preservePolygonIds ? id : new PolygonId(Guid.NewGuid())
                 };
 
                 foreach (var p in _polys[id].Points)
@@ -435,13 +440,13 @@ namespace RikusGameDevToolbox.Geometry2d
 
             return newMesh;
 
-            IEnumerable<Point> PointsToCopy(List<Guid> polyIdsToCopy)
+            IEnumerable<Point> PointsToCopy(List<PolygonId> polyIdsToCopy)
             {
                 if (polyIdsToCopy == null) return _points;
                 return polyIdsToCopy.SelectMany(id => _polys[id].Points).Distinct();
             }
 
-            IEnumerable<Edge> EdgesToCopy(List<Guid> polyIdsToCopy)
+            IEnumerable<Edge> EdgesToCopy(List<PolygonId> polyIdsToCopy)
             {
                 if (polyIdsToCopy == null) return _edges;
                 return polyIdsToCopy.SelectMany(id => _polys[id].Edges()).Distinct();
@@ -549,7 +554,7 @@ namespace RikusGameDevToolbox.Geometry2d
 
         #region ------------------------------------------ INTERNAL METHODS ----------------------------------------------
 
-        internal bool AreIntersecting(Guid polygonA, Guid polygonB)
+        internal bool AreIntersecting(PolygonId polygonA, PolygonId polygonB)
         {
             var a = _polys[polygonA];
             var b = _polys[polygonB];
@@ -674,7 +679,7 @@ namespace RikusGameDevToolbox.Geometry2d
         }
 
 
-        private void RemoveGeometry(Guid id)
+        private void RemoveGeometry(PolygonId id)
         {
             var poly = _polys[id];
 
@@ -982,7 +987,7 @@ namespace RikusGameDevToolbox.Geometry2d
     }
 
 
-private static IEnumerable<(Point a, Point b)> AsLoopingPairs(IEnumerable<Point> points)
+        private static IEnumerable<(Point a, Point b)> AsLoopingPairs(IEnumerable<Point> points)
         {
             Point previous = points.Last();
             foreach (var point in points)

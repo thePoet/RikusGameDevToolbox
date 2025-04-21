@@ -8,7 +8,7 @@ namespace RikusGameDevToolbox.Geometry2d
     //This class is a quick and dirty fix to PolygonMeshes with intersecting polygons. It removes the offending polygons.
     public static class MeshFixer
     {
-        public static List<Guid> RemoveIntersectingPolygons(PolygonMesh mesh)
+        public static List<PolygonId> RemoveIntersectingPolygons(PolygonMesh mesh)
         {
             int numPolygonRemoved = 0;
 
@@ -22,9 +22,9 @@ namespace RikusGameDevToolbox.Geometry2d
             return polygonToBeRemoved;
         }
 
-        private static List<Guid> FindPolygonsToBeRemoved(PolygonMesh mesh)
+        private static List<PolygonId> FindPolygonsToBeRemoved(PolygonMesh mesh)
         {
-            List<Guid> result = new List<Guid>();
+            List<PolygonId> result = new List<PolygonId>();
 
             foreach (var (id, polygon) in mesh.Polygons())
             {
@@ -41,7 +41,7 @@ namespace RikusGameDevToolbox.Geometry2d
 
             return result;
             
-            Guid SmallerPolygon(Guid a, Guid b) => mesh.Polygon(a).Area < mesh.Polygon(b).Area ? a : b;
+            PolygonId SmallerPolygon(PolygonId a, PolygonId b) => mesh.Polygon(a).Area < mesh.Polygon(b).Area ? a : b;
             
         }
 

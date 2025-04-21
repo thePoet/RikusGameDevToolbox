@@ -328,7 +328,7 @@ public class TestsPolygonMesh
         Assert.IsTrue(mesh.PolygonIds().Count == 3);
 
 
-        PolygonMesh mesh2 = mesh.MakeCopy(true, new List<Guid>(){poly2, poly3});
+        PolygonMesh mesh2 = mesh.MakeCopy(true, new List<PolygonId>(){poly2, poly3});
         IntegrityTest(mesh2);
         Assert.IsTrue(mesh2.Edges().Count == 6);
         Assert.IsTrue(mesh2.Points().Count == 5);
