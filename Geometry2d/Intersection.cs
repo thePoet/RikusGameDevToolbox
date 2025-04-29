@@ -3,7 +3,7 @@ using UnityEngine;
 
 namespace RikusGameDevToolbox.Geometry2d
 {
-    
+
     public static class Intersection
     {
 
@@ -108,15 +108,42 @@ namespace RikusGameDevToolbox.Geometry2d
                 (lhs, rhs) = (rhs, lhs);
             }
 
-            bool Approximately(float a, float b)
-            {
-                return Mathf.Abs(a - b) <= tolerance;
-            }
-
-            float CrossProduct2D(Vector2 a, Vector2 b)
-            {
-                return a.x * b.y - b.x * a.y;
-            }
+            bool Approximately(float a, float b) => Mathf.Abs(a - b) <= tolerance;
         }
+
+        /// <summary>
+        /// Returns true if the line segment intersects with the rectangle or is inside it.
+        /// </summary>
+        public static bool LineSegmentRectangle(Vector2 lsStart, Vector2 lsEnd, Rect rect)
+        {
+            // Check if the line segment intersects with any of the rectangle's edges
+            Vector2[] corners =
+            {
+                new (rect.xMin, rect.yMin),
+                new (rect.xMax, rect.yMin),
+                new (rect.xMax, rect.yMax),
+                new (rect.xMin, rect.yMax)
+            };
+
+            if (rect.Contains(lsStart) || rect.Contains(lsEnd)) return true;
+    
+
+            return LineSegments(lsStart, lsEnd, corners[0], corners[1]) ||
+                   LineSegments(lsStart, lsEnd, corners[1], corners[2]) ||
+                   LineSegments(lsStart, lsEnd, corners[2], corners[3]) ||
+                   LineSegments(lsStart, lsEnd, corners[3], corners[0]);
+
+        }
+
+        
+        private static float CrossProduct2D(Vector2 a, Vector2 b)
+        {
+            return a.x * b.y - a.y * b.x;
+        }
+        
     }
+    
+    
+ 
+  
 }

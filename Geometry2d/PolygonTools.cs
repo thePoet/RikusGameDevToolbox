@@ -160,6 +160,43 @@ namespace RikusGameDevToolbox.Geometry2d
             }
         }
          
+        /// <summary>
+        /// Returns true if the two line segments overlap i.e. they are collinear and at least one of the endpoints
+        /// is on the other segment.
+        /// </summary>
+        /// <param name="s1Start"></param>
+        /// <param name="s1End"></param>
+        /// <param name="s2Start"></param>
+        /// <param name="s2End"></param>
+        /// <param name="tolerance"></param>
+        /// <returns></returns>
+        public static bool AreLineSegmentsOverlapping(Vector2 s1Start, Vector2 s1End, Vector2 s2Start, Vector2 s2End,
+            float tolerance = 1e-5f)
+        {
+            // Calculate direction vectors
+            var r = s1End - s1Start;
+            var s = s2End - s2Start;
+            
+            bool areCollinear = Approximately(CrossProduct2D(r, s), 0f);
+            if (!areCollinear) return false;
+
+            return IsPointOnEdge(s1Start, s2Start, s2End, tolerance) ||
+                   IsPointOnEdge(s1End, s2Start, s2End, tolerance) ||
+                   IsPointOnEdge(s2Start, s1Start, s1End, tolerance) ||
+                   IsPointOnEdge(s2End, s1Start, s1End, tolerance);
+                  
+            
+            // Helper functions
+            bool Approximately(float a, float b) => Mathf.Abs(a - b) <= tolerance;
+
+            
+        }
+        
+        private static float CrossProduct2D(Vector2 a, Vector2 b)
+        {
+            return a.x * b.y - a.y * b.x;
+        }
+         
         internal static List<Polygon> ToPolygons(PolyTreeD tree)
         {
             var result = new List<Polygon>();
@@ -261,6 +298,8 @@ namespace RikusGameDevToolbox.Geometry2d
                 yield return i == polygon.Contour.Length - 1 ? (i, 0) : (i, i + 1);
             }
         }
+        
+        
         
         
 
