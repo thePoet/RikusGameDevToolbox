@@ -4,8 +4,7 @@ using NUnit.Framework;
 using RikusGameDevToolbox.Geometry2d;
 using UnityEngine;
 using System.Collections.Generic;
-
-
+using SharpVoronoiLib;
 
 
 namespace RikusGameDevToolbox.Tests
@@ -54,10 +53,15 @@ namespace RikusGameDevToolbox.Tests
             var pg = new PlanarGraph(Epsilon);
             pg.AddLine(new (2f,0f), new (2f,2f));
             pg.AddLine(new (3f,0f), new (3f,2f));
-            pg.AddLine(new (0f,1f), new (5f,1f));
+            var result = pg.AddLine(new (0f,1f), new (5f,1f));
             
             Assert.IsTrue( pg.NumVertices == 8 );
             Assert.IsTrue( pg.NumEdges == 7 );
+            
+            Assert.IsTrue( IsSame( pg.Position(result[0]), new Vector2(0f,1f) ));
+            Assert.IsTrue( IsSame( pg.Position(result[1]), new Vector2(2f,1f) ));
+            Assert.IsTrue( IsSame( pg.Position(result[2]), new Vector2(3f,1f) ));
+            Assert.IsTrue( IsSame( pg.Position(result[3]), new Vector2(5f,1f) ));
         }
 
         [Test]
@@ -87,10 +91,66 @@ namespace RikusGameDevToolbox.Tests
             Assert.IsTrue(pg.NumVertices == 3);
             Assert.IsTrue(pg.NumEdges == 2);
             pg.Clear();
-
+            
+            pg.AddLine(new(1f, 0f), new(2f, 0f));
+            pg.AddLine(new(3f, 0f), new(4f, 0f));
+            pg.AddLine(new(5f, 0f), new(6f, 0f));
+            pg.AddLine(new(0f, 0f), new(6f, 0f));
+            Assert.IsTrue(pg.NumVertices == 7);
+            Assert.IsTrue(pg.NumEdges == 6);
+            pg.Clear();
 
         }
-        
+
+
+        [Test]
+        public void DeleteEdges()
+        {
+            var pg = CreateSquare();
+            pg.AddLine(new(0f,0f), new(10f,10f));
+            pg.AddLine(new(10f,0f), new(0f,10f));
+            Assert.IsTrue( pg.NumVertices == 5 );
+            Assert.IsTrue( pg.NumEdges == 8 );
+            
+            
+            pg.DeleteEdge( pg.VertexAt(new Vector2(0f,0f)), 
+                           pg.VertexAt(new Vector2(10f,0f)) );
+
+            Assert.IsTrue( pg.NumVertices == 5 );
+            Assert.IsTrue( pg.NumEdges == 7 );
+            
+            pg.DeleteEdge( pg.VertexAt(new Vector2(5f,5f)), 
+                pg.VertexAt(new Vector2(10f,0f)) );
+            
+            Assert.IsTrue( pg.NumVertices == 5 );
+            Assert.IsTrue( pg.NumEdges == 6 );
+            
+            pg.DeleteEdge( pg.VertexAt(new Vector2(10f,10f)), 
+                pg.VertexAt(new Vector2(10f,0f)) );
+            
+            Assert.IsTrue( pg.NumVertices == 5 );
+            Assert.IsTrue( pg.NumEdges == 5 );
+            
+            pg.DeleteVerticesWithoutEdges();
+            Assert.IsTrue( pg.NumVertices == 4 );
+            Assert.IsTrue( pg.NumEdges == 5 );
+        }
+
+        [Test]
+        public void DeletePoints()
+        {
+            var pg = CreateSquare();
+            pg.AddLine(new(0f, 0f), new(10f, 10f));
+            pg.AddLine(new(10f, 0f), new(0f, 10f));
+            Assert.IsTrue(pg.NumVertices == 5);
+            Assert.IsTrue(pg.NumEdges == 8);
+            
+            pg.DeleteVertex( pg.VertexAt(new Vector2(5f, 5f)) );
+            
+            Assert.IsTrue( pg.NumVertices == 4 );
+            Assert.IsTrue( pg.NumEdges == 4 );
+
+        }
 
         private bool IsSame(Vector2 a, Vector2 b) => Vector2.Distance(a, b) <= Epsilon;
 

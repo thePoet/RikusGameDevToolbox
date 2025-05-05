@@ -45,52 +45,105 @@ namespace RikusGameDevToolbox.Geometry2d
             _edges.Clear();
         }        
         
-        public void AddLine(Vector2 a, Vector2 b)
+        /// <summary>
+        /// Adds a line between two points. If the line intersects with existing edges, it will split them and add new
+        /// vertices. If the line overlaps with existing edges, these will be incorporated into the line. 
+        /// </summary>
+        /// <returns>Returns all the vertices on the line. The first is the start and last one is the end.</returns>
+        public List<VertexId> AddLine(Vector2 a, Vector2 b)
         {
             Vertex va = GetOrAddVertex(a);
             Vertex vb = GetOrAddVertex(b);
+            var result = new List<VertexId>();
             
-            var nearbyEdges = EdgesInside(BoundingRect()).ToList();
-            
-            foreach (var edge in nearbyEdges)
+            var nearbyEdges = EdgesInside(RectAroundEdge(va,vb)).ToList();
+          
+            List<Vertex> verticesOnLine = VerticesOnLine(va, vb); // Find vertices that already exist on the line
+
+            for (int i = 0; i < verticesOnLine.Count-1; i++)
             {
-                var result = Overlap(va, vb, edge.Item1, edge.Item2);
-                if (result.isOverlapping)
+                Vertex v1 = verticesOnLine[i];
+                Vertex v2 = verticesOnLine[i+1];
+                
+                if (v1==v2) throw new InvalidOperationException("Something went wrong when adding a line.");
+                
+                result.Add( verticesOnLine[i].Id );
+
+                if (!IsEdgeBetween(v1.Id, v2.Id))
                 {
-                    if (result.nonOverlappingEdges == null) return;
-                    foreach (var edgePair in result.nonOverlappingEdges)
-                    {
-                        AddLine(edgePair.Item1.Position, edgePair.Item2.Position);
-                    }
-                    return;
+                    var intersections = ConnectVertices(v1, v2);
+                    if (intersections.Contains(v1.Id) || intersections.Contains(v2.Id)) throw new InvalidOperationException("Something went wrong when adding a line.");
+                    result.AddRange(intersections);
                 }
             }
+            result.Add(verticesOnLine.Last().Id);
 
-            var intersections = FindIntersections(va, vb, nearbyEdges.ToList());
-            
-            var currentVertex = va;
-            foreach (var intersection in intersections)
-            {
-                Vertex newVertex = InsertVertexOnEdge(intersection.Item1, intersection.Item2, intersection.Item3);
-                AddEdge(currentVertex, newVertex);
-                currentVertex = newVertex;
-            }
+            return result;
 
-            AddEdge(currentVertex,vb);
-            return;
-            
-            Rect BoundingRect()
+
+            // Connect vertices with an edge and add new vertices in case of intersections with existing edges.
+            // Returns the list of intersection vertices.
+            List<VertexId> ConnectVertices(Vertex a, Vertex b)
             {
-                var rect = RectExtensions.CreateRectToEncapsulate(a, b);
-                rect = rect.Grow(_epsilon);
-                return rect;
+                List<VertexId> intersectionVertices = new();
+                
+                var intersections = FindIntersections(a, b, nearbyEdges.ToList());
+                Vertex currentVertex = a;
+                foreach (var intersection in intersections)
+                {
+                    Vertex intersectionVertex = InsertVertexOnEdge(intersection.Item1, intersection.Item2, intersection.Item3);
+                    AddEdge(a, intersectionVertex);
+                    currentVertex = intersectionVertex;
+                    intersectionVertices.Add(intersectionVertex.Id);
+                }
+                AddEdge(currentVertex,b);
+                return intersectionVertices;
             }
+         
         }
         
         public void DeleteEdge(VertexId a, VertexId b)
         {
-            
+            Vertex vertexA = _verticesById.GetValueOrDefault(a);
+            Vertex vertexB = _verticesById.GetValueOrDefault(b);
+            if (vertexA == null || vertexB == null) throw new ArgumentException("Vertex not found");
+            if (vertexA == vertexB) throw new ArgumentException("Same vertex when deleting edge");
+            if (!vertexA.Connections.Contains(vertexB)) throw new ArgumentException("Edge not found");
+            vertexA.Connections.Remove(vertexB);
+            vertexB.Connections.Remove(vertexA);
+            RemoveEdgeFromCollection(vertexA, vertexB);
+            OnDeleteEdge(a,b);
         }
+
+        public void DeleteVertex(VertexId id)
+        {
+            Vertex vertex = _verticesById.GetValueOrDefault(id); 
+            if (vertex == null) throw new ArgumentException("Vertex not found");
+            var connections = vertex.Connections.ToList();
+            foreach (var connection in connections)
+            {
+                DeleteEdge(id, connection.Id);
+            }
+
+            _verticesById.Remove(id);
+            _vertices.Remove(vertex.Position, vertex);
+            OnDeleteVertex(id);
+        }
+
+        public void DeleteVerticesWithoutEdges()
+        {
+            var toBeDeleted = _verticesById.Values
+                .Where(v => v.Connections.Count == 0)
+                .Select(v => v.Id)
+                .ToList();
+
+            foreach (var id in toBeDeleted)
+            {
+                DeleteVertex(id);
+            }
+        }
+        
+        
         
         public Vector2 Position(VertexId vertexId)
         {
@@ -226,10 +279,6 @@ namespace RikusGameDevToolbox.Geometry2d
             return newVertex;
 
             
-            void RemoveEdgeFromCollection(Vertex vertex1, Vertex vertex2)
-            {
-                _edges.RemoveAll( e => e.Item1==vertex1 && e.Item2==vertex2 || e.Item1==vertex2 && e.Item2==vertex1);
-            }
 
         }
 
@@ -244,80 +293,30 @@ namespace RikusGameDevToolbox.Geometry2d
                 }
             }
         }
-        
-        
-         /// <summary>
-        /// Looks for overlap between the proposed edge v1-v2 and existing edge edgeV1-edgeV2.
+
+
+        /// <summary>
+        /// Return the vertices that are within epsilon of the line. The vertices are given in order
+        /// and include the start and the end. 
         /// </summary>
-        /// <returns>
-        ///  isOverlapping: true if the edges overlap.
-        /// nonOverlappingEdges: List of vertex pairs for edges that are the non-overlapping part of given edges.
-        /// Null if no overlap.
-        /// </returns>
-        private (bool isOverlapping, List<(Vertex, Vertex)> nonOverlappingEdges ) Overlap( Vertex v1, Vertex v2, Vertex edgeV1, Vertex edgeV2)
+        private List<Vertex> VerticesOnLine(Vertex start, Vertex end)
         {
-                
-            bool overlap = GeometryUtils.AreLineSegmentsOverlapping(v1.Position, v2.Position,
-                edgeV1.Position, edgeV2.Position);
-            
-            if (!overlap) return (false,null);
+            Rect searchArea = RectAroundEdge(start, end);
 
-            if (Vector2.Distance(v1.Position, edgeV1.Position) > Vector2.Distance(v1.Position, edgeV2.Position))
-            {
-                // Arrange vertices so that v1 is closer to edgeV1
-                (v1, v2) = (v2, v1);
-            }
-            
-            Vertex commonVertex = null;
-            if (v1 == edgeV1 || v1 == edgeV2) commonVertex = v1;
-            if (v2 == edgeV1 || v2 == edgeV2) commonVertex = v2;
-            
-            var (v1P, v2P) = (v1.Position, v2.Position);
-            var (e1P, e2P) = (edgeV1.Position, edgeV2.Position);
-            bool isV1OnEdge = GeometryUtils.IsPointOnEdge(v1P, e1P, e2P, _epsilon);
-            bool isV2OnEdge = GeometryUtils.IsPointOnEdge(v2P, e1P, e2P, _epsilon);
+            var result = _vertices.ItemsInRectangle(searchArea)
+                .Where(vertex => vertex != start && vertex != end &&
+                                 GeometryUtils.IsPointOnEdge(vertex.Position, start.Position, end.Position, _epsilon))
+                .OrderBy(v => Vector2.Distance(start.Position, v.Position))
+                .ToList();
 
-        
-            
-            if (commonVertex==null)
-            {
-                if (!isV1OnEdge && !isV2OnEdge)
-                {
-                    // Proposed edge extends the existing edge from both ends
-                    return (true, new List<(Vertex, Vertex)> { (v1, edgeV1), (v2, edgeV2) });
-                }
+            result.Insert(0, start);
+            result.Add(end);
 
-                if (isV1OnEdge && isV2OnEdge)
-                {
-                    // The proposed edge is completely inside the other edge
-                    return (true, null);
-                }
-
-                if (isV1OnEdge)
-                {
-                    return (true, new List<(Vertex, Vertex)> { (edgeV2, v2) });
-                }
-                    
-                return (true, new List<(Vertex, Vertex)> { (v1, edgeV1) });
-            }
-
-
-            if (commonVertex == v1)
-            {
-                if (isV2OnEdge) return (true,null);
-                return (isOverlapping: false, nonOverlappingEdges: null);
-            }
-            
-            if (commonVertex == v2)
-            {
-                if (isV1OnEdge) return (true,null);
-                return (isOverlapping: false, nonOverlappingEdges: null);
-            }
-    
-            throw new InvalidOperationException("Something went wrong when checking for overlap.");
-          
+            return result;
         }
         
+        
+    
         /// <summary>
         /// Returns list of intersections between the line segment v1-v2 and the given edges.
         /// </summary>
@@ -349,7 +348,19 @@ namespace RikusGameDevToolbox.Geometry2d
             return new Rect(centerPosition.x - _epsilon, centerPosition.y - _epsilon, _epsilon*2f, _epsilon*2f);
         }
         
+        private Rect RectAroundEdge(Vertex va, Vertex vb)
+        {
+            var rect = RectExtensions.CreateRectToEncapsulate(va.Position, vb.Position);
+            rect = rect.Grow(2f*_epsilon);
+            return rect;
+        }
         
+        // TODO: replace with a spatial collection
+        private void RemoveEdgeFromCollection(Vertex vertex1, Vertex vertex2)
+        {
+            _edges.RemoveAll( e => e.Item1==vertex1 && e.Item2==vertex2 || e.Item1==vertex2 && e.Item2==vertex1);
+        }
+
         #endregion
     }
 }
