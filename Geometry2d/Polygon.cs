@@ -18,10 +18,23 @@ namespace RikusGameDevToolbox.Geometry2d
         {
            var paths = new PathsD();
            paths.AddRange(outlines.Select(PathUtils.ToPathD));
-           PolyTreeD polyTree = PolygonTools.ToPolyTree(paths);
-           return PolygonTools.ToPolygons(polyTree);
+           PolyTreeD polyTree = GeometryUtils.ToPolyTree(paths);
+           return GeometryUtils.ToPolygons(polyTree);
         }
         
+        /// <summary>
+        /// Creates a regular polygon with the given number of sides and radius.
+        /// </summary>
+        public static SimplePolygon CreateRegular(int numSides, float radius)
+        {
+            var points = new Vector2[numSides];
+            for (int i = 0; i < numSides; i++)
+            {
+                points[i] = new Vector2(Mathf.Cos(2 * Mathf.PI * i / numSides), 
+                    Mathf.Sin(2 * Mathf.PI * i / numSides)) * radius;
+            }
+            return new SimplePolygon(points);
+        }
         /// Points in the outline of the polygon in CCW order.
         public Vector2[] Contour => PathUtils.ToVector2Array(PathsD[0]);
         
@@ -94,7 +107,7 @@ namespace RikusGameDevToolbox.Geometry2d
             ClipperD clipper = new();
             clipper.AddSubject(paths);
             clipper.Execute(ClipType.Union, FillRule.NonZero, polytree);
-            var result = PolygonTools.ToPolygons(polytree);
+            var result = GeometryUtils.ToPolygons(polytree);
             SortByAreaDescending(result);
             return result;
             
@@ -163,6 +176,7 @@ namespace RikusGameDevToolbox.Geometry2d
         }
 
         #endregion
+
 
 
     }

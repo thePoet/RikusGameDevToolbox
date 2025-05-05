@@ -19,7 +19,7 @@ namespace RikusGameDevToolbox.Geometry2d
             clipper.AddSubject(a.PathsD);
             clipper.AddSubject(b.PathsD);
             clipper.Execute(ClipType.Union, FillRule.NonZero, polytree);
-            return PolygonTools.ToPolygons(polytree);
+            return GeometryUtils.ToPolygons(polytree);
         }
 
         
@@ -35,7 +35,7 @@ namespace RikusGameDevToolbox.Geometry2d
                 clipper.AddSubject(polygon.PathsD);
             }
             clipper.Execute(ClipType.Union, FillRule.NonZero, polytree);
-            return PolygonTools.ToPolygons(polytree);
+            return GeometryUtils.ToPolygons(polytree);
         }
         
         /// <summary>
@@ -49,7 +49,7 @@ namespace RikusGameDevToolbox.Geometry2d
             clipper.AddSubject(a.PathsD);
             clipper.AddClip(b.PathsD);
             clipper.Execute(ClipType.Intersection, FillRule.NonZero, polytree);
-            return PolygonTools.ToPolygons(polytree);
+            return GeometryUtils.ToPolygons(polytree);
         }
 
         /// <summary>
@@ -62,7 +62,7 @@ namespace RikusGameDevToolbox.Geometry2d
             clipper.AddSubject(poly1.PathsD);
             clipper.AddClip(poly2.PathsD);
             clipper.Execute(ClipType.Difference, FillRule.NonZero, polytree);
-            return PolygonTools.ToPolygons(polytree);
+            return GeometryUtils.ToPolygons(polytree);
         }
         
         /// <summary>
@@ -81,7 +81,7 @@ namespace RikusGameDevToolbox.Geometry2d
                 clipper.AddClip(polygon.PathsD);
             }
             clipper.Execute(ClipType.Difference, FillRule.NonZero, polytree);
-            return PolygonTools.ToPolygons(polytree);
+            return GeometryUtils.ToPolygons(polytree);
         }
 
         /// <summary>
@@ -118,7 +118,7 @@ namespace RikusGameDevToolbox.Geometry2d
                     int nextIndex = (i + 1) % path.Count;
                     PointD edge2 = path[nextIndex];
 
-                    if (PolygonTools.IsPointOnEdge(ToVector2(point), ToVector2(edge1), ToVector2(edge2), tolerance))
+                    if (GeometryUtils.IsPointOnEdge(ToVector2(point), ToVector2(edge1), ToVector2(edge2), tolerance))
                     {
                         path.Insert(nextIndex, point);
                         break;

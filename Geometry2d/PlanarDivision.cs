@@ -7,7 +7,6 @@ using UnityEngine;
 
 namespace RikusGameDevToolbox.Geometry2d
 {
-    public enum IntersectionHandling {DoNotCheck, ThrowException, SplitEdges, DoNotCreateEdge}
 
     public record FaceId(Guid Value)
     {
@@ -20,7 +19,7 @@ namespace RikusGameDevToolbox.Geometry2d
         public static VertexId New() => new(Guid.NewGuid());
     }
    
-    public class PlanarDivision<T>
+    public class PlanarDivision
     {
         private class Vertex
         {
@@ -29,16 +28,15 @@ namespace RikusGameDevToolbox.Geometry2d
             public HalfEdge HalfEdge; // Random half edge that has this vertex as origin
         }
         
-        private class Face
+        private class Face 
         {
             public FaceId Id;
-            public T Data;
             public HalfEdge HalfEdge; // Random half edge of the face
             public bool IsBoundary; // Not an actual face but outside boundary of planar division i.e. the area outside faces.
             public List<HalfEdge> Contained; // For each hole/group of faces wholly inside the face, we store one half edge
             public Polygon AsPolygon => Polygon.CreateFromPaths(Paths()).First();
 
-            public List<List<Vector2>> Paths()
+            private List<List<Vector2>> Paths()
             {
                 var paths = new List<List<Vector2>> { HalfEdge.Path().ToList() };
                 if (Contained != null)
@@ -52,7 +50,7 @@ namespace RikusGameDevToolbox.Geometry2d
         private class HalfEdge
         {
             public Vertex Origin; // Vertex at the origin of the half edge
-            public FaceId FaceOnLeft; // Face on the left side of the half edge
+            public Face FaceOnLeft; // Face on the left side of the half edge
             public HalfEdge Twin; // Half edge with same vertices that goes in the opposite direction 
             public HalfEdge Next; // Next half edge in the boundary of LeftFace
             public HalfEdge Previous; // Previous half edge in the boundary of LeftFace
@@ -80,15 +78,80 @@ namespace RikusGameDevToolbox.Geometry2d
         
 
         private Dictionary<FaceId, Face> _faces = new();
+
         private SpatialCollection2d<Vertex> _vertices = new();
         private Dictionary<VertexId, Vertex> _verticesById = new();
         private HashSet<HalfEdge> _halfEdges = new();
+        private float _epsilon = 0.00001f;
 
         #endregion
         #region ------------------------------------------ PUBLIC METHODS -----------------------------------------------
 
-        public IEnumerable<FaceId> FaceIds() => _faces.Keys;
+        public IEnumerable<VertexId> Vertices() => _verticesById.Keys;
         
+        public VertexId VertexAt(Vector2 position, float tolerance = 0.00001f) => _vertices.ItemsInCircle(position, tolerance)
+            .Select(v => v.Id)
+            .FirstOrDefault();
+        
+        public int NumFaces() => _faces.Values.Count(face => face.IsBoundary == false);
+        
+        public IEnumerable<FaceId> FaceIds() => _faces.Values.Where(face => !face.IsBoundary).Select(face => face.Id);
+
+        public IEnumerable<VertexId> FaceVertices(FaceId faceId)
+        {
+            if (!_faces.TryGetValue(faceId, out var face)) throw new ArgumentException($"Face with id {faceId} does not exist.");
+            return VerticesOnFace(face.HalfEdge);
+        }
+        
+        /// <summary>
+        /// The shape of the PlanarDivision as whole given as a list of polygons. TODO: may contain holes.
+        /// </summary>
+        public List<Polygon> DivisionShapes() => _faces.Values.Where(face => face.IsBoundary).Select(face => face.AsPolygon).ToList();
+        
+        /// <summary>
+        /// Shape of the given face as Polygon. TODO: May contain holes.
+        /// </summary>
+        public Polygon FaceShape(FaceId faceId)
+        {
+            if (!_faces.TryGetValue(faceId, out var face))
+            {
+                throw new ArgumentException($"Face with id {faceId} does not exist.");
+            }
+            return face.AsPolygon;
+        }
+
+        /// <summary>
+        /// Is there an edge connecting the vertices?
+        /// </summary>
+        public bool IsEdge(VertexId v1, VertexId v2)
+        {
+            var vertex1 = _verticesById.GetValueOrDefault(v1);
+            var vertex2 = _verticesById.GetValueOrDefault(v2);
+            if (vertex1==null || vertex2==null) throw new ArgumentException("Non-existing vertex.");
+            return FindHalfEdge(vertex1, vertex2) != null;
+        }
+
+        /// <summary>
+        /// Returns the face on the left side of the edge. If the edge is a boundary edge, returns FaceId.Empty.
+        /// </summary>
+        /// <param name="edgeStart"></param>
+        /// <param name="edgeEnd"></param>
+        /// <returns></returns>
+        public FaceId FaceLeftOfEdge(VertexId edgeStart, VertexId edgeEnd)
+        {
+            var halfEdge = FindHalfEdge(_verticesById[edgeStart], _verticesById[edgeEnd]);
+            if (halfEdge.FaceOnLeft.IsBoundary)
+            {
+                return FaceId.Empty;
+            }
+            return halfEdge.FaceOnLeft.Id;
+        }
+        
+        public Vector2 VertexPosition(VertexId vertexId)
+        {
+            if (!_verticesById.TryGetValue(vertexId, out var vertex)) throw new ArgumentException($"Vertex with id {vertexId} does not exist.");
+            return vertex.Position;
+        }
 
         public VertexId AddVertex(Vector2 position)
         {
@@ -105,7 +168,7 @@ namespace RikusGameDevToolbox.Geometry2d
             return vertex.Id;
         }
 
-        public void AddEdge(VertexId vertex1, VertexId vertex2, IntersectionHandling intersectionHandling)
+        public void AddEdge(VertexId vertex1, VertexId vertex2)
         {
             var v1 = _verticesById.GetValueOrDefault(vertex1);
             var v2 = _verticesById.GetValueOrDefault(vertex2);
@@ -120,15 +183,32 @@ namespace RikusGameDevToolbox.Geometry2d
             {
                 throw new InvalidOperationException("Tried to add edge that already exists.");
             }
+            
+            if (v1==v2)
+            {
+                throw new InvalidOperationException("Tried to add edge with same start and end vertex.");
+            }
 
-            Rect boundingBox = new Rect(v1.Position, v2.Position);
+        
+            Rect boundingBox =  RectExtensions.CreateRectToEncapsulate(v1.Position, v2.Position);
             boundingBox.Grow(Mathf.Max(boundingBox.size.x, boundingBox.size.y) * 0.0001f);
             var nearbyEdges = EdgesIn(boundingBox);
-            
-            if (nearbyEdges.Exists( he => PolygonTools.AreLineSegmentsOverlapping(he.Origin.Position, he.Target.Position, v1.Position, v2.Position)))
+
+
+            foreach (var edge in nearbyEdges)
             {
-               throw new InvalidOperationException("Tried to add edge that overlaps with another edge.");
+                var result = Overlap(v1, v2, edge.Origin, edge.Target);
+                if (result.isOverlapping)
+                {
+                    if (result.nonOverlappingEdges == null) return;
+                    foreach (var edgePair in result.nonOverlappingEdges)
+                    {
+                        AddEdge(edgePair.Item1.Id, edgePair.Item2.Id);
+                    }
+                    return;
+                }
             }
+          
             
             List<(HalfEdge edge, Vector2 position)> intersections = FindIntersections(v1, v2, nearbyEdges);
 
@@ -210,6 +290,18 @@ namespace RikusGameDevToolbox.Geometry2d
             _verticesById.Remove(vertex.Id);
         }
 
+        public void TransformVertices(Func<Vector2, Vector2> transformFunction)
+        {
+            _vertices.Clear();
+            
+            foreach (Vertex vertex in _verticesById.Values)
+            {
+                vertex.Position = transformFunction(vertex.Position);
+                _vertices.Add(vertex.Position, vertex);
+            }
+        }
+
+        
         // TODO: With r-tree or something
         public FaceId FaceAt(Vector2 position)
         {
@@ -225,12 +317,12 @@ namespace RikusGameDevToolbox.Geometry2d
         
     
 
-        public List<(Vector2, Vector2, FaceId)> HalfEdges()
+        public List<(Vector2, Vector2, FaceId, bool)> HalfEdges()
         {
-            var result = new List<(Vector2, Vector2, FaceId)>();
+            var result = new List<(Vector2, Vector2, FaceId, bool )>();
             foreach (var halfEdge in _halfEdges)
             {
-                result.Add((halfEdge.Origin.Position, halfEdge.Target.Position, halfEdge.FaceOnLeft));
+                result.Add((halfEdge.Origin.Position, halfEdge.Target.Position, halfEdge.FaceOnLeft.Id, halfEdge.FaceOnLeft.IsBoundary));
             }
 
             return result;
@@ -277,7 +369,104 @@ namespace RikusGameDevToolbox.Geometry2d
 
         #region ------------------------------------------ PRIVATE METHODS ----------------------------------------------
 
+/*
+        
+        private Vertex GetOrAddVertexAt(Vector2 position)
+        {
+            var existing = _vertices.ItemsInCircle(position, _epsilon);
+            if (existing.Any()) return existing.First();
 
+            
+            boundingBox.Grow(Mathf.Max(boundingBox.size.x, boundingBox.size.y) * 0.0001f);
+            var nearbyEdges = EdgesIn(boundingBox);
+            
+            if (existing == null)
+            {
+                existing = new Vertex
+                {
+                    Id = VertexId.New(),
+                    Position = position,
+                    HalfEdge = null
+                };
+                _vertices.Add(position, existing);
+                _verticesById.Add(existing.Id, existing);
+            }
+            return existing;
+        }*/
+        
+        
+        /// <summary>
+        /// Looks for overlap between the proposed edge v1-v2 and existing edge edgeV1-edgeV2.
+        /// </summary>
+        /// <returns>
+        ///  isOverlapping: true if the edges overlap.
+        /// nonOverlappingEdges: List of vertex pairs for edges that are the non-overlapping part of given edges.
+        /// Null if no overlap.
+        /// </returns>
+        private (bool isOverlapping, List<(Vertex, Vertex)> nonOverlappingEdges ) Overlap( Vertex v1, Vertex v2, Vertex edgeV1, Vertex edgeV2)
+        {
+                
+            bool overlap = GeometryUtils.AreLineSegmentsOverlapping(v1.Position, v2.Position,
+                edgeV1.Position, edgeV2.Position);
+            
+            if (!overlap) return (false,null);
+
+            if (Vector2.Distance(v1.Position, edgeV1.Position) > Vector2.Distance(v1.Position, edgeV2.Position))
+            {
+                // Arrange vertices so that v1 is closer to edgeV1
+                (v1, v2) = (v2, v1);
+            }
+            
+            Vertex commonVertex = null;
+            if (v1 == edgeV1 || v1 == edgeV2) commonVertex = v1;
+            if (v2 == edgeV1 || v2 == edgeV2) commonVertex = v2;
+            
+            var (v1p, v2p) = (v1.Position, v2.Position);
+            var (e1p, e2p) = (edgeV1.Position, edgeV2.Position);
+            bool isV1OnEdge = GeometryUtils.IsPointOnEdge(v1p, e1p, e2p, _epsilon);
+            bool isV2OnEdge = GeometryUtils.IsPointOnEdge(v2p, e1p, e2p, _epsilon);
+
+        
+            
+            if (commonVertex==null)
+            {
+                if (!isV1OnEdge && !isV2OnEdge)
+                {
+                    // Proposed edge extends the existing edge from both ends
+                    return (true, new List<(Vertex, Vertex)> { (v1, edgeV1), (v2, edgeV2) });
+                }
+
+                if (isV1OnEdge && isV2OnEdge)
+                {
+                    // The proposed edge is completely inside the other edge
+                    return (true, null);
+                }
+
+                if (isV1OnEdge)
+                {
+                    return (true, new List<(Vertex, Vertex)> { (edgeV2, v2) });
+                }
+                    
+                return (true, new List<(Vertex, Vertex)> { (v1, edgeV1) });
+            }
+
+
+            if (commonVertex == v1)
+            {
+                if (isV2OnEdge) return (true,null);
+                return (isOverlapping: false, nonOverlappingEdges: null);
+            }
+            
+            if (commonVertex == v2)
+            {
+                if (isV1OnEdge) return (true,null);
+                return (isOverlapping: false, nonOverlappingEdges: null);
+            }
+    
+            throw new InvalidOperationException("Something went wrong when checking for overlap.");
+          
+        }
+        
         private HalfEdge HalfEdgeConnecting(Vertex v1, Vertex v2)
         {
             if (v1 == null || v2 == null) return null;
@@ -297,20 +486,11 @@ namespace RikusGameDevToolbox.Geometry2d
 
         private void AddEdgeUnconnectedVertices(Vertex v1, Vertex v2)
         {
-            // FaceId faceId = FaceAt(v1.Position);
-            FaceId faceId = FaceId.New();
-            
-            var halfEdge1 = new HalfEdge
-            {
-                Origin = v1,
-                FaceOnLeft = faceId,
-            };
-            
-            var halfEdge2 = new HalfEdge
-            {
-                Origin = v2,
-                FaceOnLeft = faceId,
-            };
+            var halfEdge1 = new HalfEdge();
+            halfEdge1.Origin = v1;
+        
+            var halfEdge2 = new HalfEdge();
+            halfEdge2.Origin = v2;
             
             halfEdge1.Next = halfEdge2;
             halfEdge1.Previous = halfEdge2;
@@ -321,17 +501,15 @@ namespace RikusGameDevToolbox.Geometry2d
             
             v1.HalfEdge = halfEdge1;
             v2.HalfEdge = halfEdge2;
-            /*
-            if (faceId!=FaceId.Empty)
-            {
-                var face = _faces[faceId];
-                if (face.Contained == null) face.Contained = new List<HalfEdge>();
-                face.Contained.Add(halfEdge1);
-            }*/
             
             _halfEdges.Add(halfEdge1);
             _halfEdges.Add(halfEdge2);
+           
+            Face face = CreateFace(halfEdge1, isBoundary: true);
             
+            halfEdge1.FaceOnLeft = face;
+            halfEdge2.FaceOnLeft = face;
+
         }
         
         private void AddEdgeOneConnectedVertex(Vertex connectedVertex, Vertex unconnectedVertex)
@@ -395,10 +573,55 @@ namespace RikusGameDevToolbox.Geometry2d
             
             _halfEdges.Add(halfEdge1);
             _halfEdges.Add(halfEdge2);
-            
-            SetFace(halfEdge1, FaceId.New());
-            SetFace(halfEdge2, FaceId.New());
 
+            var face1 = halfEdge1.Next.FaceOnLeft;
+            var face2 = halfEdge2.Next.FaceOnLeft;
+
+            if (!face1.IsBoundary && !face2.IsBoundary) // if splitting normal face
+            {
+                SetFace(halfEdge1, face1);
+                Face newFace = CreateFace(halfEdge2, isBoundary: false);
+                SetFace(halfEdge2, newFace);
+            }
+            else if (face1.IsBoundary && face2.IsBoundary) // if connecting two boundaries
+            {
+                if (face1 != face2) // Different boundaries are combined into one boundary
+                {
+                    _faces.Remove(face2.Id);
+                    SetFace(halfEdge1, face1);
+                }
+                else // Same boundary => one inner face is created
+                {
+                    bool halfEdge1IsBoundary = GeometryUtils.IsClockwise(halfEdge1.Path());
+                    if (halfEdge1IsBoundary)
+                    {
+                        halfEdge1.FaceOnLeft = face1;
+                        var newInnerFace = CreateFace(halfEdge2, isBoundary: false);
+                        SetFace(halfEdge2, newInnerFace);
+                    }
+                    else
+                    {
+                        halfEdge2.FaceOnLeft = face1;
+                        var newInnerFace = CreateFace(halfEdge1, isBoundary: false);
+                        SetFace(halfEdge1, newInnerFace);
+                    }
+                }
+            }
+            else if (face1.IsBoundary != face2.IsBoundary) // i.e. if one face is completely inside the other...
+            {
+                // We'll destroy the boundary face and replace it with the regular face
+                if (face1.IsBoundary)
+                {
+                    _faces.Remove(face2.Id);
+                    SetFace(halfEdge1, face1);
+                }
+                else
+                {
+                    _faces.Remove(face1.Id);
+                    SetFace(halfEdge1, face2);
+                }
+                if (halfEdge1.FaceOnLeft != halfEdge2.FaceOnLeft) throw new InvalidOperationException("Something went wrong when setting faces.");
+            }
         }
         
         
@@ -467,11 +690,11 @@ namespace RikusGameDevToolbox.Geometry2d
 
             if (!onlyEdgeFromOrigin)
             {
-                SetFace(edge.Twin.Next, FaceId.New());
+                SetFace(edge.Twin.Next, CreateFace(edge.Twin.Next, isBoundary: false)); // TEMP
             }
             if (!onlyEdgeFromTarget)
             {
-                SetFace(edge.Next, FaceId.New());
+                SetFace(edge.Next, CreateFace(edge.Next, isBoundary: false)); // TEMP
             }
             
             
@@ -567,9 +790,8 @@ namespace RikusGameDevToolbox.Geometry2d
         /// <summary>
         ///  Follows the path starting from the given half edge and sets the face for all of them.
         /// </summary>
-        private void SetFace(HalfEdge edge, FaceId face)
+        private void SetFace(HalfEdge edge, Face face)
         {
-      
             HalfEdge current = edge;
             for (int i = 0; i < 10000; i++)
             {
@@ -579,7 +801,32 @@ namespace RikusGameDevToolbox.Geometry2d
             }
             throw new InvalidOperationException("Infinite loop in SetFaceForPath");
         }
+
+        private List<VertexId> VerticesOnFace(HalfEdge edge)
+        {
+            List<VertexId> result = new();
+            HalfEdge current = edge;
+            for (int i = 0; i < 10000; i++)
+            {
+                result.Add(current.Origin.Id);
+                current = current.Next;
+                if (current == edge) return result;
+            }
+            throw new InvalidOperationException("Infinite loop in SetFaceForPath");
+        }
         
+        
+        private Face CreateFace(HalfEdge edge, bool isBoundary)
+        {
+            var face = new Face
+            {
+                Id = FaceId.New(),
+                IsBoundary = isBoundary,
+                HalfEdge = edge,
+            };
+           _faces.Add(face.Id, face);
+           return face;
+        }
         
         #endregion
 

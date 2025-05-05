@@ -934,7 +934,7 @@ namespace RikusGameDevToolbox.Geometry2d
 
                 if (currentPoint != startPoint) continue;
 
-                bool clockwise = PolygonTools.IsClockwise(outline.points.Select(p => p.Position));
+                bool clockwise = GeometryUtils.IsClockwise(outline.points.Select(p => p.Position));
                 bool emptyOnRight = EmptyOnRightPoints(outline.points[0], outline.points[1]);
 
                 outline.isHole = (clockwise && emptyOnRight) || (!clockwise && !emptyOnRight);
@@ -1009,7 +1009,7 @@ namespace RikusGameDevToolbox.Geometry2d
             foreach (Point point in pointsInArea)
             {
                 if (point == edgePoint1 || point == edgePoint2) continue;
-                if (PolygonTools.IsPointOnEdge(point.Position, edgePoint1.Position, edgePoint2.Position, epsilon))
+                if (GeometryUtils.IsPointOnEdge(point.Position, edgePoint1.Position, edgePoint2.Position, epsilon))
                 {
                     result.Add(point);
                 }

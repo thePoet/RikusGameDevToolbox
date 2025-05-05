@@ -7,7 +7,7 @@ using UnityEngine;
 
 namespace RikusGameDevToolbox.Geometry2d
 {
-    public static class PolygonTools
+    public static class GeometryUtils
     {
         // An intersection of the outlines of two Polygon2D:s.
         private struct OutlineIntersection
@@ -18,21 +18,7 @@ namespace RikusGameDevToolbox.Geometry2d
             public bool IsStartOfIntersectingArea; // In CCW direction
             public override string ToString() => $"Intersection of {PointIdx1} and {PointIdx2} at {IntersectionPosition} is start: {IsStartOfIntersectingArea}"; 
         }
-        
-        
-        /// <summary>
-        /// Creates a regular polygon with the given number of sides and radius.
-        /// </summary>
-        public static SimplePolygon CreateRegular(int numSides, float radius)
-        {
-            var points = new Vector2[numSides];
-            for (int i = 0; i < numSides; i++)
-            {
-                points[i] = new Vector2(Mathf.Cos(2 * Mathf.PI * i / numSides), 
-                    Mathf.Sin(2 * Mathf.PI * i / numSides)) * radius;
-            }
-            return new SimplePolygon(points);
-        }
+
 
         public static bool IsClockwise(IEnumerable<Vector2> points)
         {
@@ -160,6 +146,15 @@ namespace RikusGameDevToolbox.Geometry2d
             }
         }
          
+         public static Vector2 ProjectPointOnEdge(Vector2 point, Vector2 edgeStart, Vector2 edgeEnd)
+         {
+             Vector2 edgeVector = edgeEnd - edgeStart;
+             Vector2 pointVector = point - edgeStart;
+             float t = Vector2.Dot(pointVector, edgeVector) / edgeVector.sqrMagnitude;
+             t = Mathf.Clamp01(t);
+             return edgeStart + t * edgeVector;
+         }
+         
         /// <summary>
         /// Returns true if the two line segments overlap i.e. they are collinear and at least one of the endpoints
         /// is on the other segment.
@@ -173,12 +168,7 @@ namespace RikusGameDevToolbox.Geometry2d
         public static bool AreLineSegmentsOverlapping(Vector2 s1Start, Vector2 s1End, Vector2 s2Start, Vector2 s2End,
             float tolerance = 1e-5f)
         {
-            // Calculate direction vectors
-            var r = s1End - s1Start;
-            var s = s2End - s2Start;
-            
-            bool areCollinear = Approximately(CrossProduct2D(r, s), 0f);
-            if (!areCollinear) return false;
+            if (!AreLinesCollinear(s1Start, s1End, s2Start, s2End)) return false;
 
             return IsPointOnEdge(s1Start, s2Start, s2End, tolerance) ||
                    IsPointOnEdge(s1End, s2Start, s2End, tolerance) ||
@@ -190,6 +180,21 @@ namespace RikusGameDevToolbox.Geometry2d
             bool Approximately(float a, float b) => Mathf.Abs(a - b) <= tolerance;
 
             
+        }
+        
+        /// <summary>
+        /// Return true if the two lines are collinear.
+        /// </summary>
+        /// <param name="a1">Point on line A</param>
+        /// <param name="a2">Another point on line A</param>
+        /// <param name="b1">Point on line B</param>
+        /// <param name="b2">Another point on line B</param>
+        /// <returns></returns>
+        public static bool AreLinesCollinear(Vector2 a1, Vector2 a2, Vector2 b1, Vector2 b2)
+        {
+            var r = a2 - a1;
+            var s = b2 - b1;
+            return Mathf.Abs(CrossProduct2D(r, s)) < 1e-5f ;
         }
         
         private static float CrossProduct2D(Vector2 a, Vector2 b)

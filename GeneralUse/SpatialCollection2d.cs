@@ -92,6 +92,11 @@ namespace RikusGameDevToolbox.GeneralUse
 
             return node;
         }
+
+        public void Clear()
+        {
+            _root = null;
+        }
         
         public List<T> ItemsInRectangle(Rect area)
         {
