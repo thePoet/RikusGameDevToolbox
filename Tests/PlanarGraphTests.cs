@@ -1,11 +1,7 @@
-using System;
 using System.Linq;
 using NUnit.Framework;
 using RikusGameDevToolbox.Geometry2d;
 using UnityEngine;
-using System.Collections.Generic;
-using SharpVoronoiLib;
-
 
 namespace RikusGameDevToolbox.Tests
 {
@@ -45,6 +41,20 @@ namespace RikusGameDevToolbox.Tests
         }
 
         [Test]
+        public void EdgeStartingFromEdge()
+        {
+            var pg = CreateSquare();
+            Assert.IsTrue( pg.NumVertices == 4 );
+            Assert.IsTrue( pg.NumEdges == 4 );
+            pg.AddLine(new(0f,5f), new(10f,5f));
+            Assert.IsTrue( pg.NumVertices == 6 );
+            Assert.IsTrue( pg.NumEdges == 7 );
+            var v = pg.VertexAt(new Vector2(10f, 5f));
+            Assert.IsTrue(pg.EdgesOfVertex(v).Count()==3);
+
+        }
+
+        [Test]
         public void SplitTwoEdges()
         {
             //       |   |
@@ -73,6 +83,8 @@ namespace RikusGameDevToolbox.Tests
             Assert.IsTrue(pg.NumVertices == 4);
             Assert.IsTrue(pg.NumEdges == 3);
             pg.Clear();
+            Assert.IsTrue(pg.NumVertices == 0);
+            Assert.IsTrue(pg.NumEdges == 0);
             
             pg.AddLine(new(1f, 0f), new(2f, 0f));
             pg.AddLine(new(0f, 0f), new(10f, 0f));
@@ -149,12 +161,9 @@ namespace RikusGameDevToolbox.Tests
             
             Assert.IsTrue( pg.NumVertices == 4 );
             Assert.IsTrue( pg.NumEdges == 4 );
-
         }
 
         private bool IsSame(Vector2 a, Vector2 b) => Vector2.Distance(a, b) <= Epsilon;
-
-
 
         private PlanarGraph CreateSquare()
         {

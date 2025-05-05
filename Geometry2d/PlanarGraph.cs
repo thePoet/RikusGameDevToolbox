@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using RikusGameDevToolbox.GeneralUse;
+using RikusGameDevToolbox.RTree;
 using UnityEngine;
 
 namespace RikusGameDevToolbox.Geometry2d
@@ -14,24 +15,53 @@ namespace RikusGameDevToolbox.Geometry2d
        {
            public VertexId Id;
            public Vector2 Position;
-           public readonly List<Vertex> Connections = new();
+           public List<Edge> Edges = new List<Edge>();
+           public IEnumerable<Vertex> Connections => Edges.Select(e => e.VertexA == this ? e.VertexB : e.VertexA);
+           public Edge EdgeConnectingTo(Vertex v) => Edges.FirstOrDefault(e => e.VertexA == v || e.VertexB == v);
+           
+           public override string ToString()
+           {
+                return $"Vertex: {Id} ({Position.x}, {Position.y})";
+           }
+       }
+
+       private class Edge : ISpatialData
+       {
+           public Vertex VertexA { get; }
+           public Vertex VertexB { get; }
+           public Envelope Envelope { get; }
+              
+           public Edge(Vertex vertexA, Vertex vertexB)
+           {
+                VertexA = vertexA;
+                VertexB = vertexB;
+                Envelope = new Envelope(
+                    minX: Mathf.Min(vertexA.Position.x, vertexB.Position.x),
+                    minY: Mathf.Min(vertexA.Position.y, vertexB.Position.y),
+                    maxX: Mathf.Max(vertexA.Position.x, vertexB.Position.x),
+                    maxY: Mathf.Max(vertexA.Position.y, vertexB.Position.y)
+                    );
+           }
+
+           public override string ToString()
+           {
+                return $"Edge: {VertexA} - {VertexB}";
+           }
        }
 
 
         private readonly float _epsilon;
         private readonly SpatialCollection2d<Vertex> _vertices = new();
         private readonly Dictionary<VertexId, Vertex> _verticesById = new();
-        private readonly List<(Vertex, Vertex)> _edges = new(); // TODO: replace with a spatial collection
-
-
+        private readonly RTree<Edge> _edgesSpatial = new();
 
 
         #region ----------------------------------- PUBLIC METHODS & PROPERTIES ----------------------------------------
 
-        public int NumEdges => _edges.Count;
+        public int NumEdges => _edgesSpatial.Count;
         public int NumVertices => _verticesById.Count;
-        public List<(Vector2, Vector2)> Edges => _edges.Select(e => (e.Item1.Position, e.Item2.Position)).ToList();
-        public List<Vector2> Vertices => _verticesById.Values.Select(v => v.Position).ToList();
+        public List<(VertexId, VertexId)> Edges => _edgesSpatial.All().Select(e => (e.VertexA.Id, e.VertexB.Id)).ToList();
+        public List<VertexId> Vertices => _verticesById.Keys.ToList();
 
         public PlanarGraph(float epsilon = 0.0001f)
         {
@@ -42,7 +72,7 @@ namespace RikusGameDevToolbox.Geometry2d
         {
             _vertices.Clear();
             _verticesById.Clear();
-            _edges.Clear();
+            _edgesSpatial.Clear();
         }        
         
         /// <summary>
@@ -56,7 +86,7 @@ namespace RikusGameDevToolbox.Geometry2d
             Vertex vb = GetOrAddVertex(b);
             var result = new List<VertexId>();
             
-            var nearbyEdges = EdgesInside(RectAroundEdge(va,vb)).ToList();
+            var nearbyEdges = EdgesIntersecting(RectAroundEdge(va,vb)).ToList();
           
             List<Vertex> verticesOnLine = VerticesOnLine(va, vb); // Find vertices that already exist on the line
 
@@ -77,6 +107,13 @@ namespace RikusGameDevToolbox.Geometry2d
                 }
             }
             result.Add(verticesOnLine.Last().Id);
+            
+            /*
+            Debug.Log("----------");
+            foreach (var edge in _edges)
+            {
+                Debug.Log(edge);
+            }*/
 
             return result;
 
@@ -91,7 +128,8 @@ namespace RikusGameDevToolbox.Geometry2d
                 Vertex currentVertex = a;
                 foreach (var intersection in intersections)
                 {
-                    Vertex intersectionVertex = InsertVertexOnEdge(intersection.Item1, intersection.Item2, intersection.Item3);
+                    Vertex intersectionVertex = InsertVertexOnEdge(intersection.edge, intersection.intersectionPosition);
+                   
                     AddEdge(a, intersectionVertex);
                     currentVertex = intersectionVertex;
                     intersectionVertices.Add(intersectionVertex.Id);
@@ -108,21 +146,23 @@ namespace RikusGameDevToolbox.Geometry2d
             Vertex vertexB = _verticesById.GetValueOrDefault(b);
             if (vertexA == null || vertexB == null) throw new ArgumentException("Vertex not found");
             if (vertexA == vertexB) throw new ArgumentException("Same vertex when deleting edge");
-            if (!vertexA.Connections.Contains(vertexB)) throw new ArgumentException("Edge not found");
-            vertexA.Connections.Remove(vertexB);
-            vertexB.Connections.Remove(vertexA);
-            RemoveEdgeFromCollection(vertexA, vertexB);
-            OnDeleteEdge(a,b);
+            
+            Edge edge = vertexA.EdgeConnectingTo(vertexB);
+            if (edge==null) throw new ArgumentException("Edge not found");
+
+            DeleteEdge(edge);
         }
+
+
 
         public void DeleteVertex(VertexId id)
         {
             Vertex vertex = _verticesById.GetValueOrDefault(id); 
             if (vertex == null) throw new ArgumentException("Vertex not found");
-            var connections = vertex.Connections.ToList();
-            foreach (var connection in connections)
+           
+            foreach (var edge in vertex.Edges.ToList())
             {
-                DeleteEdge(id, connection.Id);
+                DeleteEdge(edge);
             }
 
             _verticesById.Remove(id);
@@ -133,7 +173,7 @@ namespace RikusGameDevToolbox.Geometry2d
         public void DeleteVerticesWithoutEdges()
         {
             var toBeDeleted = _verticesById.Values
-                .Where(v => v.Connections.Count == 0)
+                .Where(v => v.Edges.Count == 0)
                 .Select(v => v.Id)
                 .ToList();
 
@@ -157,7 +197,7 @@ namespace RikusGameDevToolbox.Geometry2d
             Vertex vertexA = _verticesById.GetValueOrDefault(a);
             Vertex vertexB = _verticesById.GetValueOrDefault(b);
             if (vertexA == null || vertexB == null) throw new ArgumentException("Vertex not found");
-            return vertexA.Connections.Contains(vertexB);
+            return vertexA.EdgeConnectingTo(vertexB) != null;
         }
         
         public IEnumerable<VertexId> EdgesOfVertex(VertexId vertexId)
@@ -185,8 +225,7 @@ namespace RikusGameDevToolbox.Geometry2d
 
         public IEnumerable<(VertexId, VertexId)> EdgesIn(Rect rectangle)
         {
-            return EdgesInside(rectangle)
-                .Select(edge => (edge.Item1.Id, edge.Item2.Id));
+            return EdgesIntersecting(rectangle).Select(edge => (edge.VertexA.Id, edge.VertexB.Id));
         }
 
         #endregion
@@ -218,10 +257,10 @@ namespace RikusGameDevToolbox.Geometry2d
             var existingVertices = _vertices.ItemsInRectangle(EpsilonRect(position));
             if (existingVertices.Any()) return existingVertices.First();
 
-           var edges = EdgesInside(EpsilonRect(position)).ToList();
+           var edges = EdgesIntersecting(EpsilonRect(position)).ToList();
            if (edges.Any())
            {
-               return InsertVertexOnEdge(edges.First().Item1, edges.First().Item2, position);
+               return InsertVertexOnEdge(edges.First(), position);
            }
 
             var newVertex = new Vertex
@@ -240,19 +279,30 @@ namespace RikusGameDevToolbox.Geometry2d
         private void AddEdge(Vertex vertexA, Vertex vertexB)
         {
             if (vertexA == vertexB) return;
-            if (vertexA.Connections.Contains(vertexB)) return; // Edge already exists
+            if (vertexA.EdgeConnectingTo(vertexB) != null) return; // Edge already exists
             
-            vertexA.Connections.Add(vertexB);
-            vertexB.Connections.Add(vertexA);
-            _edges.Add((vertexA, vertexB));
+            Edge edge = new Edge(vertexA, vertexB);
+            vertexA.Edges.Add(edge);
+            vertexB.Edges.Add(edge);
+            
+            _edgesSpatial.Insert(edge);
 
             OnAddEdge(vertexA.Id, vertexB.Id);
         }
         
-        private Vertex InsertVertexOnEdge(Vertex vertexA, Vertex vertexB, Vector2 position)
+        private void DeleteEdge(Edge edge)
         {
+            edge.VertexA.Edges.Remove(edge);
+            edge.VertexB.Edges.Remove(edge);
+            _edgesSpatial.Delete(edge);
+            OnDeleteEdge(edge.VertexA.Id, edge.VertexB.Id);
+        }
+        
+        private Vertex InsertVertexOnEdge(Edge edge, Vector2 position)
+        {
+            var oldEdge = edge;
             // Set the position exactly on the edge:
-            position = GeometryUtils.ProjectPointOnEdge(position, vertexA.Position, vertexB.Position);
+            position = GeometryUtils.ProjectPointOnEdge(position, oldEdge.VertexA.Position, oldEdge.VertexB.Position);
            
             var newVertex = new Vertex
             {
@@ -261,36 +311,42 @@ namespace RikusGameDevToolbox.Geometry2d
             };
             _vertices.Add(newVertex.Position, newVertex);
             _verticesById[newVertex.Id] = newVertex;
+            
+            oldEdge.VertexA.Edges.Remove(oldEdge);
+            oldEdge.VertexB.Edges.Remove(oldEdge);
+            if (!_edgesSpatial.Delete(oldEdge)) throw new InvalidOperationException("Failed to delete edge from spatial index");
+            
+            // First new edge
+            Edge edge1 = new Edge(oldEdge.VertexA, newVertex);
+            edge1.VertexA.Edges.Add(edge1);
+            edge1.VertexB.Edges.Add(edge1);
+            _edgesSpatial.Insert(edge1);
            
-            RemoveEdgeFromCollection(vertexA, vertexB);
-
-            vertexA.Connections.Remove(vertexB);
-            vertexB.Connections.Remove(vertexA);
-            vertexA.Connections.Add(newVertex);
-            vertexB.Connections.Add(newVertex);
-            newVertex.Connections.Add(vertexA);
-            newVertex.Connections.Add(vertexB);
+            // Second new edge
+            Edge edge2 = new Edge(newVertex, oldEdge.VertexB);
+            edge2.VertexA.Edges.Add(edge2);
+            edge2.VertexB.Edges.Add(edge2);
+            _edgesSpatial.Insert(edge2);
             
-            _edges.Add((vertexA, newVertex));
-            _edges.Add((vertexB, newVertex));
-            
-            OnSplitEdge(vertexA.Id, vertexB.Id, newVertex.Id);
+            OnSplitEdge(oldEdge.VertexA.Id, oldEdge.VertexB.Id, newVertex.Id);
             
             return newVertex;
-
-            
-
         }
 
         
-        private IEnumerable<(Vertex, Vertex)> EdgesInside(Rect rectangle)
+        private IEnumerable<Edge> EdgesIntersecting(Rect rectangle)
         {
-            foreach (var edge in _edges)
+            Envelope searchArea = new Envelope(
+                minX: rectangle.xMin,
+                minY: rectangle.yMin,
+                maxX: rectangle.xMax,
+                maxY: rectangle.yMax
+            );
+            return _edgesSpatial.Search(searchArea).Where( edge => IsEdgeIntersecting(edge, rectangle));
+            
+            bool IsEdgeIntersecting(Edge edge, Rect rect)
             {
-                if (Intersection.LineSegmentRectangle(edge.Item1.Position, edge.Item2.Position, rectangle))
-                {
-                    yield return (edge.Item1, edge.Item2);
-                }
+                return Intersection.LineSegmentRectangle(edge.VertexA.Position, edge.VertexB.Position, rect);
             }
         }
 
@@ -322,21 +378,21 @@ namespace RikusGameDevToolbox.Geometry2d
         /// </summary>
         /// <returns>List of intersecting edges and intersection positions.
         /// Intersections are ordered by distance from v1 with the closest first.</returns>
-        private List<(Vertex, Vertex, Vector2)> FindIntersections(Vertex v1, Vertex v2, List<(Vertex, Vertex)> edges)
+        private List<(Edge edge, Vector2 intersectionPosition)> FindIntersections(Vertex v1, Vertex v2, List<Edge> edges)
         {
-            var result = new List<(Vertex, Vertex, Vector2 intersectionPos)>();
+            var result = new List<(Edge, Vector2 intersectionPos)>();
 
             foreach (var edge in edges)
             {
-                if (edge.Item1 == v1 || edge.Item1 == v2) continue;
-                if (edge.Item2 == v1 || edge.Item2 == v2) continue;
+                if (edge.VertexA == v1 || edge.VertexA == v2) continue;
+                if (edge.VertexB == v1 || edge.VertexB == v2) continue;
 
                 Vector2? intersection = Intersection.LineSegmentPosition(v1.Position, v2.Position,
-                    edge.Item1.Position, edge.Item2.Position);
+                    edge.VertexA.Position, edge.VertexB.Position);
                 if (intersection == null) continue;
 
                 var intersectionPoint = intersection.Value;
-                result.Add((edge.Item1, edge.Item2, intersectionPoint));
+                result.Add((edge, intersectionPoint));
             }
 
             return result.OrderBy(i => Vector2.Distance(v1.Position, i.intersectionPos)).ToList();
@@ -355,11 +411,7 @@ namespace RikusGameDevToolbox.Geometry2d
             return rect;
         }
         
-        // TODO: replace with a spatial collection
-        private void RemoveEdgeFromCollection(Vertex vertex1, Vertex vertex2)
-        {
-            _edges.RemoveAll( e => e.Item1==vertex1 && e.Item2==vertex2 || e.Item1==vertex2 && e.Item2==vertex1);
-        }
+      
 
         #endregion
     }
