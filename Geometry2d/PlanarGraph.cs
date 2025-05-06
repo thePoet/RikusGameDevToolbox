@@ -7,72 +7,94 @@ using UnityEngine;
 
 namespace RikusGameDevToolbox.Geometry2d
 {
+    /// <summary>
+    /// This class represents a planar graph, which is a collection of vertices and edges in a 2D space. The edges
+    /// never cross. If a new edge is added that intersects with existing edges, the existing edges are split and new
+    /// vertices are created in the intersection points. The edges and vertices are stored in spatial structures for
+    /// fast search.
+    /// </summary>
     public class PlanarGraph
     {
-        public record VertexId(Guid Value) { public static VertexId New() => new(Guid.NewGuid()); }
-     
-       private class Vertex
-       {
-           public VertexId Id;
-           public Vector2 Position;
-           public List<Edge> Edges = new List<Edge>();
-           public IEnumerable<Vertex> Connections => Edges.Select(e => e.VertexA == this ? e.VertexB : e.VertexA);
-           public Edge EdgeConnectingTo(Vertex v) => Edges.FirstOrDefault(e => e.VertexA == v || e.VertexB == v);
-           
-           public override string ToString()
-           {
-                return $"Vertex: {Id} ({Position.x}, {Position.y})";
-           }
-       }
+        public record VertexId(Guid Value)
+        {
+            public static VertexId New() => new(Guid.NewGuid());
+        }
 
-       private class Edge : ISpatialData
-       {
-           public Vertex VertexA { get; }
-           public Vertex VertexB { get; }
-           public Envelope Envelope { get; }
-              
-           public Edge(Vertex vertexA, Vertex vertexB)
-           {
+        private class Vertex
+        {
+            public VertexId Id;
+            public Vector2 Position;
+            public List<Edge> Edges = new();
+            public IEnumerable<Vertex> Connections => Edges.Select(e => e.VertexA == this ? e.VertexB : e.VertexA);
+            public Edge EdgeConnectingTo(Vertex v) => Edges.FirstOrDefault(e => e.VertexA == v || e.VertexB == v);
+            public override string ToString() => $"Vertex: {Id} ({Position.x}, {Position.y})";
+        }
+
+        private class Edge : ISpatialData
+        {
+            public Vertex VertexA { get; }
+            public Vertex VertexB { get; }
+            public Envelope Envelope { get; private set; }
+            public override string ToString() => $"Edge: {VertexA} - {VertexB}";
+
+            public Edge(Vertex vertexA, Vertex vertexB)
+            {
                 VertexA = vertexA;
                 VertexB = vertexB;
-                Envelope = new Envelope(
-                    minX: Mathf.Min(vertexA.Position.x, vertexB.Position.x),
-                    minY: Mathf.Min(vertexA.Position.y, vertexB.Position.y),
-                    maxX: Mathf.Max(vertexA.Position.x, vertexB.Position.x),
-                    maxY: Mathf.Max(vertexA.Position.y, vertexB.Position.y)
-                    );
-           }
-
-           public override string ToString()
-           {
-                return $"Edge: {VertexA} - {VertexB}";
-           }
-       }
-
+                UpdateEnvelope();
+            }
+            
+            public void UpdateEnvelope()
+            {
+                Envelope = new Envelope(RectExtensions.CreateRectToEncapsulate(VertexA.Position, VertexB.Position));
+            }
+        }
 
         private readonly float _epsilon;
         private readonly SpatialCollection2d<Vertex> _vertices = new();
         private readonly Dictionary<VertexId, Vertex> _verticesById = new();
-        private readonly RTree<Edge> _edgesSpatial = new();
+        private readonly RTree<Edge> _edges = new();
 
+        private Action<VertexId> _onAddVertex;
+        private Action<VertexId, VertexId> _onAddEdge;
+        private Action<VertexId, VertexId, VertexId> _onSplitEdge; 
+        private Action<VertexId> _onDeleteVertex;
+        private Action<VertexId, VertexId> _onDeleteEdge;
 
         #region ----------------------------------- PUBLIC METHODS & PROPERTIES ----------------------------------------
 
-        public int NumEdges => _edgesSpatial.Count;
+        public int NumEdges => _edges.Count;
         public int NumVertices => _verticesById.Count;
-        public List<(VertexId, VertexId)> Edges => _edgesSpatial.All().Select(e => (e.VertexA.Id, e.VertexB.Id)).ToList();
+        public List<(VertexId, VertexId)> Edges => _edges.All().Select(e => (e.VertexA.Id, e.VertexB.Id)).ToList();
         public List<VertexId> Vertices => _verticesById.Keys.ToList();
 
-        public PlanarGraph(float epsilon = 0.0001f)
+        /// <summary>
+        /// 
+        /// </summary>
+        /// <param name="epsilon">Vertices closer than epsilon are considered the same vertex.</param>
+        /// <param name="onAddVertex">Action called after adding a vertex</param>
+        /// <param name="onAddEdge">Action called after adding an edge</param>
+        /// <param name="onSplitEdge">Action called after a vertex is inserted on an edge. First two parameters
+        /// are verices of the edge. Note that in this case "onAddVertex" and "onAddEdge" are not called </param>
+        /// <param name="onDeleteVertex">Action called after vertex is deleted</param>
+        /// <param name="onDeleteEdge">Action called after edge is deleted</param>
+        public PlanarGraph(float epsilon = 0.0001f,Action<VertexId> onAddVertex = null, Action<VertexId, 
+                VertexId> onAddEdge = null, Action<VertexId, VertexId, VertexId> onSplitEdge = null, 
+            Action<VertexId> onDeleteVertex = null, Action<VertexId, VertexId> onDeleteEdge = null)
         {
             _epsilon = epsilon;
+            _onAddVertex = onAddVertex;
+            _onAddEdge = onAddEdge;
+            _onSplitEdge = onSplitEdge;
+            _onDeleteVertex = onDeleteVertex;
+            _onDeleteEdge = onDeleteEdge;
         }
         
         public void Clear()
         {
             _vertices.Clear();
             _verticesById.Clear();
-            _edgesSpatial.Clear();
+            _edges.Clear();
         }        
         
         /// <summary>
@@ -108,33 +130,27 @@ namespace RikusGameDevToolbox.Geometry2d
             }
             result.Add(verticesOnLine.Last().Id);
             
-            /*
-            Debug.Log("----------");
-            foreach (var edge in _edges)
-            {
-                Debug.Log(edge);
-            }*/
-
+    
             return result;
 
 
             // Connect vertices with an edge and add new vertices in case of intersections with existing edges.
             // Returns the list of intersection vertices.
-            List<VertexId> ConnectVertices(Vertex a, Vertex b)
+            List<VertexId> ConnectVertices(Vertex vertexA, Vertex vertexB)
             {
                 List<VertexId> intersectionVertices = new();
                 
-                var intersections = FindIntersections(a, b, nearbyEdges.ToList());
-                Vertex currentVertex = a;
+                var intersections = FindIntersections(vertexA, vertexB, nearbyEdges.ToList());
+                Vertex currentVertex = vertexA;
                 foreach (var intersection in intersections)
                 {
                     Vertex intersectionVertex = InsertVertexOnEdge(intersection.edge, intersection.intersectionPosition);
                    
-                    AddEdge(a, intersectionVertex);
+                    AddEdge(vertexA, intersectionVertex);
                     currentVertex = intersectionVertex;
                     intersectionVertices.Add(intersectionVertex.Id);
                 }
-                AddEdge(currentVertex,b);
+                AddEdge(currentVertex,vertexB);
                 return intersectionVertices;
             }
          
@@ -153,8 +169,10 @@ namespace RikusGameDevToolbox.Geometry2d
             DeleteEdge(edge);
         }
 
-
-
+        /// <summary>
+        /// Destroys the vertex and all edges connected to it.
+        /// </summary>
+        /// <exception cref="ArgumentException"></exception>
         public void DeleteVertex(VertexId id)
         {
             Vertex vertex = _verticesById.GetValueOrDefault(id); 
@@ -183,8 +201,6 @@ namespace RikusGameDevToolbox.Geometry2d
             }
         }
         
-        
-        
         public Vector2 Position(VertexId vertexId)
         {
             Vertex vertex = _verticesById.GetValueOrDefault(vertexId);
@@ -200,6 +216,10 @@ namespace RikusGameDevToolbox.Geometry2d
             return vertexA.EdgeConnectingTo(vertexB) != null;
         }
         
+        /// <summary>
+        /// Returns vertices that are connected with edge to the given vertex.
+        /// </summary>
+        /// <exception cref="ArgumentException">If vertex does not exist.</exception>
         public IEnumerable<VertexId> EdgesOfVertex(VertexId vertexId)
         {
             Vertex vertex = _verticesById.GetValueOrDefault(vertexId);
@@ -218,34 +238,56 @@ namespace RikusGameDevToolbox.Geometry2d
             return null;
         }
         
+        /// <summary>
+        /// Vertices inside the rectangle
+        /// </summary>
         public IEnumerable<VertexId> VerticesIn(Rect rectangle)
         {
             return _vertices.ItemsInRectangle(rectangle).Select(v => v.Id);
         }
 
+        /// <summary>
+        /// Returns edges that are intersecting the rectangle or completely inside it.
+        /// </summary>
         public IEnumerable<(VertexId, VertexId)> EdgesIn(Rect rectangle)
         {
             return EdgesIntersecting(rectangle).Select(edge => (edge.VertexA.Id, edge.VertexB.Id));
         }
 
+        public void TransformVertices(Func<Vector2, Vector2> transformFunction)
+        {
+            foreach (Vertex v in _verticesById.Values)
+            {
+                v.Position = transformFunction(v.Position);
+            }
+            
+            RebuildSpatialCollections();
+        }
+
+        
         #endregion
         #region ------------------------------------------ PROTECTED METHODS ----------------------------------------------
 
         
         protected void OnAddVertex(VertexId vertex)
         {
-        }
+            if (_onAddVertex != null) _onAddVertex(vertex);
+        } 
         protected void OnAddEdge(VertexId vertexA, VertexId vertexB)
         {
+            if (_onAddEdge != null) _onAddEdge(vertexA, vertexB);
         }
         protected void OnSplitEdge(VertexId vertexA, VertexId vertexB, VertexId newVertex)
         {
+            if (_onSplitEdge != null) _onSplitEdge(vertexA, vertexB, newVertex);
         }
         protected void OnDeleteVertex(VertexId vertex)
         {
+            if (_onDeleteVertex != null) _onDeleteVertex(vertex);
         }
         protected void OnDeleteEdge(VertexId vertexA, VertexId vertexB)
         {
+            if (_onDeleteEdge != null) _onDeleteEdge(vertexA, vertexB);
         }
         
         #endregion
@@ -285,7 +327,7 @@ namespace RikusGameDevToolbox.Geometry2d
             vertexA.Edges.Add(edge);
             vertexB.Edges.Add(edge);
             
-            _edgesSpatial.Insert(edge);
+            _edges.Insert(edge);
 
             OnAddEdge(vertexA.Id, vertexB.Id);
         }
@@ -294,7 +336,7 @@ namespace RikusGameDevToolbox.Geometry2d
         {
             edge.VertexA.Edges.Remove(edge);
             edge.VertexB.Edges.Remove(edge);
-            _edgesSpatial.Delete(edge);
+            _edges.Delete(edge);
             OnDeleteEdge(edge.VertexA.Id, edge.VertexB.Id);
         }
         
@@ -314,43 +356,39 @@ namespace RikusGameDevToolbox.Geometry2d
             
             oldEdge.VertexA.Edges.Remove(oldEdge);
             oldEdge.VertexB.Edges.Remove(oldEdge);
-            if (!_edgesSpatial.Delete(oldEdge)) throw new InvalidOperationException("Failed to delete edge from spatial index");
+            if (!_edges.Delete(oldEdge)) throw new InvalidOperationException("Failed to delete edge from spatial index");
             
             // First new edge
             Edge edge1 = new Edge(oldEdge.VertexA, newVertex);
             edge1.VertexA.Edges.Add(edge1);
             edge1.VertexB.Edges.Add(edge1);
-            _edgesSpatial.Insert(edge1);
+            _edges.Insert(edge1);
            
             // Second new edge
             Edge edge2 = new Edge(newVertex, oldEdge.VertexB);
             edge2.VertexA.Edges.Add(edge2);
             edge2.VertexB.Edges.Add(edge2);
-            _edgesSpatial.Insert(edge2);
+            _edges.Insert(edge2);
             
             OnSplitEdge(oldEdge.VertexA.Id, oldEdge.VertexB.Id, newVertex.Id);
             
             return newVertex;
         }
 
-        
+        /// <summary>
+        /// Returns edges that are intersecting the rectangle or contained wholly in it.
+        /// </summary>
         private IEnumerable<Edge> EdgesIntersecting(Rect rectangle)
         {
-            Envelope searchArea = new Envelope(
-                minX: rectangle.xMin,
-                minY: rectangle.yMin,
-                maxX: rectangle.xMax,
-                maxY: rectangle.yMax
-            );
-            return _edgesSpatial.Search(searchArea).Where( edge => IsEdgeIntersecting(edge, rectangle));
+            Envelope searchArea = new Envelope(rectangle);
+            return _edges.Search(searchArea).Where( edge => IsEdgeIntersectingRect(edge, rectangle));
             
-            bool IsEdgeIntersecting(Edge edge, Rect rect)
+            bool IsEdgeIntersectingRect(Edge edge, Rect rect)
             {
                 return Intersection.LineSegmentRectangle(edge.VertexA.Position, edge.VertexB.Position, rect);
             }
         }
-
-
+        
         /// <summary>
         /// Return the vertices that are within epsilon of the line. The vertices are given in order
         /// and include the start and the end. 
@@ -370,8 +408,6 @@ namespace RikusGameDevToolbox.Geometry2d
 
             return result;
         }
-        
-        
     
         /// <summary>
         /// Returns list of intersections between the line segment v1-v2 and the given edges.
@@ -398,7 +434,7 @@ namespace RikusGameDevToolbox.Geometry2d
             return result.OrderBy(i => Vector2.Distance(v1.Position, i.intersectionPos)).ToList();
         }
 
-        // Returns rectangle with side lenght of 2 * _epsilon with given coordinate as center:
+        // Returns rectangle with side length of 2 * _epsilon with given coordinate as center:
         private Rect EpsilonRect(Vector2 centerPosition)
         {
             return new Rect(centerPosition.x - _epsilon, centerPosition.y - _epsilon, _epsilon*2f, _epsilon*2f);
@@ -411,6 +447,26 @@ namespace RikusGameDevToolbox.Geometry2d
             return rect;
         }
         
+        /// <summary>
+        /// Rebuilds the spatial collections. This is needed after the vertices have been moved.
+        /// </summary>
+        private void RebuildSpatialCollections()
+        {
+            _vertices.Clear();
+            foreach (Vertex v in _verticesById.Values)
+            {
+                _vertices.Add(v.Position, v);
+            }
+            
+            var edges = _edges.All();
+            _edges.Clear();
+            foreach (Edge edge in edges)
+            {
+                edge.UpdateEnvelope();
+                _edges.Insert(edge);
+            }
+         
+        }
       
 
         #endregion

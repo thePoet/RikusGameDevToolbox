@@ -1,4 +1,5 @@
 ﻿using System;
+using UnityEngine;
 
 namespace RikusGameDevToolbox.RTree
 {
@@ -76,6 +77,14 @@ namespace RikusGameDevToolbox.RTree
 			MaxX = x;
 			MinY = y;
 			MaxY = y;
+		}
+
+		public Envelope(Rect rect)
+		{
+			MinX = rect.min.x;
+			MinY = rect.min.y;
+			MaxX = rect.max.x;
+			MaxY = rect.max.y;
 		}
 
 		public void Extend(Envelope other)

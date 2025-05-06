@@ -44,6 +44,11 @@ namespace RikusGameDevToolbox.RTree
 		{
 			return DoSearch(boundingBox).Select(x => (T)x.Peek()).ToList();
 		}
+		public IEnumerable<T> Search(Rect boundingBox)
+		{
+			var envelope = new Envelope(boundingBox);
+			return DoSearch(envelope).Select(x => (T)x.Peek()).ToList();
+		}
 
 		public void Insert(T item)
 		{
