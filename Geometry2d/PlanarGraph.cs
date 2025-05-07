@@ -15,10 +15,7 @@ namespace RikusGameDevToolbox.Geometry2d
     /// </summary>
     public class PlanarGraph
     {
-        public record VertexId(Guid Value)
-        {
-            public static VertexId New() => new(Guid.NewGuid());
-        }
+    
 
         private class Vertex
         {
@@ -269,23 +266,23 @@ namespace RikusGameDevToolbox.Geometry2d
         #region ------------------------------------------ PROTECTED METHODS ----------------------------------------------
 
         
-        protected void OnAddVertex(VertexId vertex)
+        protected virtual void OnAddVertex(VertexId vertex)
         {
             if (_onAddVertex != null) _onAddVertex(vertex);
         } 
-        protected void OnAddEdge(VertexId vertexA, VertexId vertexB)
+        protected virtual void OnAddEdge(VertexId vertexA, VertexId vertexB)
         {
             if (_onAddEdge != null) _onAddEdge(vertexA, vertexB);
         }
-        protected void OnSplitEdge(VertexId vertexA, VertexId vertexB, VertexId newVertex)
+        protected virtual void OnSplitEdge(VertexId vertexA, VertexId vertexB, VertexId newVertex)
         {
             if (_onSplitEdge != null) _onSplitEdge(vertexA, vertexB, newVertex);
         }
-        protected void OnDeleteVertex(VertexId vertex)
+        protected virtual void OnDeleteVertex(VertexId vertex)
         {
             if (_onDeleteVertex != null) _onDeleteVertex(vertex);
         }
-        protected void OnDeleteEdge(VertexId vertexA, VertexId vertexB)
+        protected virtual void OnDeleteEdge(VertexId vertexA, VertexId vertexB)
         {
             if (_onDeleteEdge != null) _onDeleteEdge(vertexA, vertexB);
         }

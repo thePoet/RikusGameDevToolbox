@@ -8,17 +8,8 @@ using UnityEngine;
 namespace RikusGameDevToolbox.Geometry2d
 {
 
-    public record FaceId(Guid Value)
-    {
-        public static FaceId New() => new(Guid.NewGuid());
-        public static FaceId Empty => new(Guid.Empty); 
-    }
 
-    public record VertexId(Guid Value)
-    {
-        public static VertexId New() => new(Guid.NewGuid());
-    }
-   
+    
     public class PlanarDivision
     {
         private class Vertex
@@ -564,6 +555,7 @@ namespace RikusGameDevToolbox.Geometry2d
                 Previous = previousV2,
                 Next = previousV1.Next,
             };
+            
             (halfEdge1.Twin, halfEdge2.Twin) = (halfEdge2, halfEdge1);
 
             previousV1.Next = halfEdge1;
