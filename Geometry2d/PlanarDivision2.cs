@@ -9,11 +9,18 @@ namespace RikusGameDevToolbox.Geometry2d
 {
     public class PlanarDivision2 : PlanarGraph
     {
+        private enum FaceType
+        {
+            Normal,     
+            Boundary,   
+            Line
+        }
+        
         private class Face : ISpatialData
         {
             public FaceId Id;
             public HalfEdge HalfEdge; // Random half edge of the face
-            public bool IsBoundary; // Not an actual face but outside boundary of planar division i.e. the area outside faces.
+            public FaceType FaceType;
             public List<HalfEdge> Contained; // For each hole/group of faces wholly inside the face, we store one half edge
        
             public Envelope Envelope { get; set; }
@@ -32,17 +39,19 @@ namespace RikusGameDevToolbox.Geometry2d
         
         private Dictionary<VertexId, HalfEdge> _incidentEdge = new();
         private Dictionary<FaceId, Face> _faces = new();
+        private HashSet<Face> _boundaryFaces = new();
         private RTree<Face> _facesSpatial = new();
         private HashSet<HalfEdge> _halfEdges = new();
        
         #region ----------------------------------------- PUBLIC PROPERTIES --------------------------------------------
        
-        public IEnumerable<FaceId> AllFaces() => _faces.Values.Where(face => !face.IsBoundary).Select(face => face.Id);
+        public IEnumerable<FaceId> AllFaces() => _faces.Values.Where(face => face.FaceType==FaceType.Normal).Select(face => face.Id);
 
         // TODO: does not ensure face is in rect, just its bounding box
-        public IEnumerable<FaceId> FacesIn(Rect rect) => _facesSpatial.Search(rect).Where(face => !face.IsBoundary).Select(face => face.Id);
+        public IEnumerable<FaceId> FacesIn(Rect rect) => _facesSpatial.Search(rect).Where(face => face.FaceType==FaceType.Normal).Select(face => face.Id);
         public Polygon FacePolygon(FaceId faceId) => FaceAsPolygon(_faces[faceId]);
-        public int NumFaces => _faces.Count(face => !face.Value.IsBoundary);
+        public int NumFaces => _faces.Values.Count(face => face.FaceType==FaceType.Normal);
+        public int NumGroups => _faces.Values.Count(face => face.FaceType==FaceType.Boundary);
         
         #endregion
         #region ------------------------------------------ PUBLIC METHODS -----------------------------------------------
@@ -53,7 +62,7 @@ namespace RikusGameDevToolbox.Geometry2d
 
         public FaceId FaceAt(Vector2 position)
         {
-            var candidates = _facesSpatial.Search(position).Where(face => !face.IsBoundary);
+            var candidates = _facesSpatial.Search(position).Where(face => face.FaceType==FaceType.Normal);
             foreach (var face in candidates)
             {
                 if (IsPointOnFace(position, face)) return face.Id;
@@ -132,11 +141,13 @@ namespace RikusGameDevToolbox.Geometry2d
             
             _halfEdges.Add(halfEdge1);
             _halfEdges.Add(halfEdge2);
-           
-            Face face = CreateFace(halfEdge1, isBoundary: true);
+
+            SetNewFaceOnHalfEdgesStartingFrom(halfEdge1);
+
+            //Face face = CreateFace(halfEdge1, isBoundary: true);
             
-            halfEdge1.FaceOnLeft = face;
-            halfEdge2.FaceOnLeft = face;
+            //halfEdge1.FaceOnLeft = face;
+            //halfEdge2.FaceOnLeft = face;
 
         }
         
@@ -151,7 +162,7 @@ namespace RikusGameDevToolbox.Geometry2d
             {
                 Origin = v1,
                 Previous = previousHalfEdge,
-                FaceOnLeft = previousHalfEdge.FaceOnLeft,
+              //  FaceOnLeft = previousHalfEdge.FaceOnLeft,
             };
             
             var halfEdge2 = new HalfEdge
@@ -159,7 +170,7 @@ namespace RikusGameDevToolbox.Geometry2d
                 Origin = v2,
                 Previous = halfEdge1,
                 Next = previousHalfEdge.Next,
-                FaceOnLeft = previousHalfEdge.FaceOnLeft,
+                //FaceOnLeft = previousHalfEdge.FaceOnLeft,
             };
             
             halfEdge1.Next = halfEdge2;
@@ -172,6 +183,9 @@ namespace RikusGameDevToolbox.Geometry2d
             
             _halfEdges.Add(halfEdge1);
             _halfEdges.Add(halfEdge2);
+
+            DeleteFace(previousHalfEdge.FaceOnLeft);
+            SetNewFaceOnHalfEdgesStartingFrom(previousHalfEdge);
 
         }
         
@@ -206,8 +220,16 @@ namespace RikusGameDevToolbox.Geometry2d
             var face1 = halfEdge1.Next.FaceOnLeft;
             var face2 = halfEdge2.Next.FaceOnLeft;
 
-        
-            
+            DeleteFace(face1);
+            if (face1 != face2) DeleteFace(face2);
+
+            var newFace1 = SetNewFaceOnHalfEdgesStartingFrom(halfEdge1);
+            if (halfEdge2.FaceOnLeft != newFace1) // Unless both halfedges are part of the same face...
+            {
+                SetNewFaceOnHalfEdgesStartingFrom(halfEdge2);
+            }
+
+            /*
             if (!face1.IsBoundary && !face2.IsBoundary) // if splitting normal face
             {
                 UpdateFace(halfEdge1, face1);
@@ -223,7 +245,7 @@ namespace RikusGameDevToolbox.Geometry2d
                 }
                 else // Same boundary => one inner face is created
                 {
-                    bool halfEdge1IsBoundary = GeometryUtils.IsClockwise(Path(halfEdge1));
+                    bool halfEdge1IsBoundary = GeometryUtils.IsClockwise(FaceVertexPositions(halfEdge1));
                     if (halfEdge1IsBoundary)
                     {
                         UpdateFace(halfEdge1, face1);
@@ -253,6 +275,7 @@ namespace RikusGameDevToolbox.Geometry2d
                 }
                 if (halfEdge1.FaceOnLeft != halfEdge2.FaceOnLeft) throw new InvalidOperationException("Something went wrong when setting faces.");
             }
+            */
         }
         
                 
@@ -317,43 +340,28 @@ namespace RikusGameDevToolbox.Geometry2d
 
             _halfEdges.Remove(edge); 
             _halfEdges.Remove(edge.Twin);
-
-            if (!onlyEdgeFromOrigin && !onlyEdgeFromTarget)
-            {
-//something
-
-                return;
-            }
             
+            // Update faces:
             
-            if (edge.FaceOnLeft != edge.Twin.FaceOnLeft) throw new InvalidOperationException("Something wen wrong when deleting edge.");
-
-            if (onlyEdgeFromOrigin && onlyEdgeFromTarget)
-            {
-                DeleteFace(edge.FaceOnLeft);
-                return;
-            }
-
-            if (onlyEdgeFromOrigin)
-            {
-                UpdateFace(edge.Next, edge.FaceOnLeft);
-                return;
-            }
+            var faceLeft = edge.FaceOnLeft;
+            var faceRight = edge.Twin.FaceOnLeft;
             
-            UpdateFace(edge.Previous, edge.Twin.FaceOnLeft);
-            return;
-  /*
+            DeleteFace(faceLeft);
+            if (faceLeft != faceRight) DeleteFace(faceRight);
+
+            Face newFace1 = null;
+
             if (!onlyEdgeFromOrigin)
             {
-                UpdateFace(edge.Twin.Next, CreateFace(edge.Twin.Next, isBoundary: false)); // TEMP
+                newFace1 = SetNewFaceOnHalfEdgesStartingFrom(edge.Previous);
             }
-            if (!onlyEdgeFromTarget)
+
+            if (!onlyEdgeFromTarget && edge.Next.FaceOnLeft != newFace1)
             {
-                UpdateFace(edge.Next, CreateFace(edge.Next, isBoundary: false)); // TEMP
+                SetNewFaceOnHalfEdgesStartingFrom(edge.Next);
             }
-*/
         }
-        
+        /*
         private Face CreateFace(HalfEdge edge, bool isBoundary)
         {
             var face = new Face
@@ -366,32 +374,58 @@ namespace RikusGameDevToolbox.Geometry2d
             _faces.Add(face.Id, face);
             _facesSpatial.Insert(face);
             return face;
-        }
+        }*/
         
         /// <summary>
         ///  Follows the path starting from the given half edge and sets the face for all of them and updates the spatial index.
         /// </summary>
-        private void UpdateFace(HalfEdge edge, Face face)
+        /// 
+        /*
+        private void UpdateFace(HalfEdge startEdge, Face face)
         {
-            face.HalfEdge = edge;
-            HalfEdge current = edge;
-            for (int i = 0; i < 10000; i++)
+            face.HalfEdge = startEdge;
+            foreach (var edge  in FaceHalfEdges(startEdge))
             {
-                current.FaceOnLeft = face;
-                current = current.Next;
-                if (current == edge)
-                {
-                    if (!_facesSpatial.Delete(face)) throw new InvalidOperationException("Could not delete face from spatial collection.");
-                    UpdateFaceEnvelope(face);
-                    _facesSpatial.Insert(face);
-                    return;
-                }
+                edge.FaceOnLeft = face;
             }
-            throw new InvalidOperationException("Infinite loop in SetFaceForPath");
-        }
+            _facesSpatial.Delete(face);
+            UpdateFaceEnvelope(face);
+            _facesSpatial.Insert(face);
+        }*/
 
+        private Face SetNewFaceOnHalfEdgesStartingFrom(HalfEdge startEdge)
+        {
+            var face = new Face
+            {
+                Id = FaceId.New(),
+                HalfEdge = startEdge
+            };
+            foreach (var edge  in FaceHalfEdges(startEdge))
+            {
+                edge.FaceOnLeft = face;
+            }
+            face.FaceType = GetFaceType(startEdge);
+            Debug.Log("Face created, type: " + face.FaceType);
+            UpdateFaceEnvelope(face);
+            _facesSpatial.Insert(face);
+            _faces.Add(face.Id, face);
+            return face;
+            
+            
+             FaceType GetFaceType(HalfEdge startEdge)
+            {
+                if (FaceHalfEdges(startEdge).All(edge => edge.FaceOnLeft == edge.Twin.FaceOnLeft)) return FaceType.Line;
+                if (GeometryUtils.IsClockwise(FaceVertexPositions(startEdge))) return FaceType.Boundary;
+                return FaceType.Normal;
+            }        
+        }
+        
+    
+            
+            
         private void DeleteFace(Face face)
         {
+            Debug.Log("Face deleted: " + face.FaceType);
             _faces.Remove(face.Id);
             if (!_facesSpatial.Delete(face)) throw new InvalidOperationException("Could not delete face from spatial collection.");
         }
@@ -409,6 +443,7 @@ namespace RikusGameDevToolbox.Geometry2d
 
         }
         
+    
         private List<HalfEdge> EdgesOriginatingFrom(VertexId vertex)
         {
             var result = new List<HalfEdge>();
@@ -433,26 +468,29 @@ namespace RikusGameDevToolbox.Geometry2d
         }
 
 
-        private IEnumerable<Vector2> Path(HalfEdge halfEdge)
+        private IEnumerable<Vector2> FaceVertexPositions(HalfEdge halfEdge)
         {
-            var current = halfEdge;
-            int i = 0;
-            do
-            {
-                i++;
-                if (i > 10000) throw new InvalidOperationException("Infinite loop in Path");
-                yield return Position(current.Origin);
-                current = current.Next;
-            } while (current != halfEdge);
+           return FaceHalfEdges(halfEdge).Select(he => Position(he.Origin));
         }
-        
+
+        private IEnumerable<HalfEdge> FaceHalfEdges(HalfEdge first)
+        {
+            var current = first;
+            for (int i = 0; i < 10000; i++)
+            {
+                yield return current; 
+                current = current.Next; 
+                if (current == first) yield break;
+            } 
+            throw new InvalidOperationException("Infinite loop in FaceHalfEdges"); 
+        }
         
         private List<List<Vector2>> Paths(Face face)
         {
-            var paths = new List<List<Vector2>> { Path(face.HalfEdge).ToList() };
+            var paths = new List<List<Vector2>> { FaceVertexPositions(face.HalfEdge).ToList() };
             if (face.Contained != null)
             {
-                paths.AddRange(face.Contained.Select(halfEdge => Path(halfEdge).ToList()));
+                paths.AddRange(face.Contained.Select(halfEdge => FaceVertexPositions(halfEdge).ToList()));
             }
 
             return paths;
@@ -471,7 +509,7 @@ namespace RikusGameDevToolbox.Geometry2d
 
         private void UpdateFaceEnvelope(Face face)
         {
-            face.Envelope = new Envelope( RectExtensions.CreateRectToEncapsulate(Path(face.HalfEdge)) );
+            face.Envelope = new Envelope( RectExtensions.CreateRectToEncapsulate(FaceVertexPositions(face.HalfEdge)) );
         }
         
         #endregion

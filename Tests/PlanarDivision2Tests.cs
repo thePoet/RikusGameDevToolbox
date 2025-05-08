@@ -10,6 +10,7 @@ namespace RikusGameDevToolbox.Tests
     public class PlanarDivision2Tests
     {
         private readonly Vector2[] _squareCorners = { new(0f, 0f), new (10f, 0f), new (10f, 10f), new (0f, 10f) };
+        private readonly Vector2[] _squareCorners2 = { new(20f, 0f), new (30f, 0f), new (30f, 10f), new (20f, 10f) };
         
         [Test]
         public void SplittingSquare()
@@ -21,10 +22,11 @@ namespace RikusGameDevToolbox.Tests
             pd.AddLine(_squareCorners[2], _squareCorners[3]);
             pd.AddLine(_squareCorners[3], _squareCorners[0]);
             
-            
+          
             Assert.IsTrue(pd.NumFaces==1);
             Assert.IsTrue(pd.NumEdges==4);
             Assert.IsTrue(pd.NumVertices==4);
+            Assert.IsTrue(pd.NumGroups==1);
             Assert.IsFalse(pd.FaceAt(new(5f,5f)) == FaceId.Empty);
             Assert.IsTrue(pd.FaceAt(new(11f,11f)) == FaceId.Empty);
             
@@ -59,6 +61,57 @@ namespace RikusGameDevToolbox.Tests
             Assert.IsFalse(faces.Contains(FaceId.Empty));
 
 
+        }
+
+
+        [Test]
+        public void Groups()
+        {
+            var pd = new PlanarDivision2();
+            
+            pd.AddLine(_squareCorners[0], _squareCorners[1]);
+            pd.AddLine(_squareCorners[1], _squareCorners[2]);
+            pd.AddLine(_squareCorners[2], _squareCorners[3]);
+            pd.AddLine(_squareCorners[3], _squareCorners[0]);
+            
+            pd.AddLine(_squareCorners2[0], _squareCorners2[1]);
+            pd.AddLine(_squareCorners2[1], _squareCorners2[2]);
+            pd.AddLine(_squareCorners2[2], _squareCorners2[3]);
+            pd.AddLine(_squareCorners2[3], _squareCorners2[0]);
+            
+            Assert.IsTrue(pd.NumFaces==2);
+            Assert.IsTrue(pd.NumEdges==8);
+            Assert.IsTrue(pd.NumVertices==8);
+            Assert.IsTrue(pd.NumGroups==2);
+            
+            pd.AddLine(_squareCorners[1], _squareCorners2[0]);
+            
+            Assert.IsTrue(pd.NumFaces==2);
+            Assert.IsTrue(pd.NumEdges==9);
+            Assert.IsTrue(pd.NumVertices==8);
+            Assert.IsTrue(pd.NumGroups==1);
+            
+            pd.AddLine(_squareCorners[2], _squareCorners2[3]);
+            
+            Assert.IsTrue(pd.NumFaces==3);
+            Assert.IsTrue(pd.NumEdges==10);
+            Assert.IsTrue(pd.NumVertices==8);
+            Assert.IsTrue(pd.NumGroups==1);
+            
+            pd.DeleteEdge(pd.VertexAt(_squareCorners[2]),pd.VertexAt(_squareCorners2[3]));
+
+            Assert.IsTrue(pd.NumFaces==2);
+            Assert.IsTrue(pd.NumEdges==9);
+            Assert.IsTrue(pd.NumVertices==8);
+            Assert.IsTrue(pd.NumGroups==1);
+            
+
+            pd.DeleteEdge(pd.VertexAt(_squareCorners[1]),pd.VertexAt(_squareCorners2[0]));
+
+            Assert.IsTrue(pd.NumFaces==2);
+            Assert.IsTrue(pd.NumEdges==8);
+            Assert.IsTrue(pd.NumVertices==8);
+            Assert.IsTrue(pd.NumGroups==2);
         }
     }
 }
