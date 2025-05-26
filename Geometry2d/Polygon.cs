@@ -14,11 +14,11 @@ namespace RikusGameDevToolbox.Geometry2d
     {
         internal PathsD PathsD;
         
-        public static List<Polygon> CreateFromPaths(IEnumerable<IEnumerable<Vector2>> outlines)
+        public static List<Polygon> CreateFromPaths(IEnumerable<IEnumerable<Vector2>> paths)
         {
-           var paths = new PathsD();
-           paths.AddRange(outlines.Select(PathUtils.ToPathD));
-           PolyTreeD polyTree = GeometryUtils.ToPolyTree(paths);
+           var pathsD = new PathsD();
+           pathsD.AddRange(paths.Select(PathUtils.ToPathD));
+           PolyTreeD polyTree = GeometryUtils.ToPolyTree(pathsD);
            return GeometryUtils.ToPolygons(polyTree);
         }
         
@@ -35,6 +35,9 @@ namespace RikusGameDevToolbox.Geometry2d
             }
             return new SimplePolygon(points);
         }
+        
+        public int NumHoles => PathsD.Count(path => !Clipper.IsPositive(path));
+        
         /// Points in the outline of the polygon in CCW order.
         public Vector2[] Contour => PathUtils.ToVector2Array(PathsD[0]);
         
@@ -63,13 +66,25 @@ namespace RikusGameDevToolbox.Geometry2d
             return CreateRectToEncapsulate(Contour);
         }
         
-        public IEnumerable<Edge> Edges()
+        public IEnumerable<Edge> ContourEdges()
         {
             foreach ((int a, int b) in PointIndicesForEdges())
             {
                 yield return new Edge(ToVector2(PathsD[0][a]), ToVector2(PathsD[0][b]));
             }
         }
+        
+        public IEnumerable<(Vector2, Vector2)> Edges()
+        {
+            for (int i = 0; i < PathsD.Count; i++)
+            {
+                foreach ((int a, int b) in PointIndicesForEdges(i))
+                {
+                    yield return new (ToVector2(PathsD[i][a]), ToVector2(PathsD[i][b]));
+                }
+            }
+        }
+
         
         public void Simplify(float tolerance)
         {
@@ -81,7 +96,7 @@ namespace RikusGameDevToolbox.Geometry2d
         /// </summary>
         public float Circumference()
         {
-            return Edges().Sum(edge => edge.Length);
+            return ContourEdges().Sum(edge => edge.Length);
         }
         
         

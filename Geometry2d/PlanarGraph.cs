@@ -152,7 +152,10 @@ namespace RikusGameDevToolbox.Geometry2d
             }
          
         }
-        
+
+
+
+
         public void DeleteEdge(VertexId a, VertexId b)
         {
             Vertex vertexA = _verticesById.GetValueOrDefault(a);
@@ -251,7 +254,7 @@ namespace RikusGameDevToolbox.Geometry2d
             return EdgesIntersecting(rectangle).Select(edge => (edge.VertexA.Id, edge.VertexB.Id));
         }
 
-        public void TransformVertices(Func<Vector2, Vector2> transformFunction)
+        public virtual void TransformVertices(Func<Vector2, Vector2> transformFunction)
         {
             foreach (Vertex v in _verticesById.Values)
             {

@@ -2,6 +2,8 @@
 using System.Collections.Generic;
 using JetBrains.Annotations;
 
+#nullable enable
+
 namespace SharpVoronoiLib
 {
     /// <summary>

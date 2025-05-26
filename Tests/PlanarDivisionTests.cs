@@ -1,9 +1,9 @@
-using System;
-using System.Linq;
+
 using NUnit.Framework;
 using RikusGameDevToolbox.Geometry2d;
 using UnityEngine;
 using System.Collections.Generic;
+using System.Linq;
 
 
 namespace RikusGameDevToolbox.Tests
@@ -11,173 +11,154 @@ namespace RikusGameDevToolbox.Tests
     public class PlanarDivisionTests
     {
         private readonly Vector2[] _squareCorners = { new(0f, 0f), new (10f, 0f), new (10f, 10f), new (0f, 10f) };
+        private readonly Vector2[] _squareCorners2 = { new(20f, 0f), new (30f, 0f), new (30f, 10f), new (20f, 10f) };
         
         [Test]
-        public void Square()
+        public void SplittingSquare()
         {
-            var (pd,_) = CreateSquare();
+            var pd = PlanarDivisionPolygon(_squareCorners);
             
-            Assert.IsTrue( pd.FaceIds().Count()==1 );
-
-            var faceId = pd.FaceIds().First();
-            var faceShape = pd.FaceShape(faceId);
-            
-            for (int i=0; i<4; i++)
-            {
-                Assert.IsTrue(faceShape.Contour.Count(v => AlmostSame(v, _squareCorners[i])) == 1);
-            }
-            
-            List<VertexId> vertices = pd.FaceVertices(faceId).ToList();
-            Assert.IsTrue(vertices.Count == 4);
-            
-            Assert.IsTrue(pd.FaceLeftOfEdge(vertices[0], vertices[1]) == faceId);
-            Assert.IsTrue(pd.FaceLeftOfEdge(vertices[1], vertices[0]) == FaceId.Empty);
-        }
-
-
-        [Test]
-        public void OverlappingEdges()
-        {
-            var pd = new PlanarDivision();
-
-            var v1 = pd.VertexAt(new Vector2(1f, 0f));
-            var v2 = pd.VertexAt(new Vector2(2f, 0f));
-            var v3 = pd.VertexAt(new Vector2(3f, 0f));
-            var v4 = pd.VertexAt(new Vector2(4f, 0f));
-
-
-            pd.AddEdge(v1,v3);
-            pd.AddEdge(v2,v4);
-            
-            Assert.IsTrue( pd.IsEdge(v1,v2));
-            Assert.IsTrue( pd.IsEdge(v2,v3));
-            Assert.IsTrue( pd.IsEdge(v3,v4));
-
-
-            
-
           
+            Assert.IsTrue(pd.NumFaces==1);
+            Assert.IsTrue(pd.NumEdges==4);
+            Assert.IsTrue(pd.NumVertices==4);
             
-//            Assert.That(() => pd.AddEdge(v3,v4), Throws.TypeOf<InvalidOperationException>());
-
-
-            Assert.IsTrue( pd.VertexAt(new Vector2(5f,5f)) == null );
-
-        }
-
-        [Test]
-        public void BuildingOnSquare()
-        {
-            var (pd, vertices) = CreateSquare();
-
-            var v1 = vertices[1];
-            Assert.IsTrue(v1 != null); 
-            var v2 = vertices[2];
-            Assert.IsTrue(v2 != null); 
-            var squareFace = pd.FaceLeftOfEdge(v1, v2);
-
+            Assert.IsFalse(pd.FaceAt(new(5f,5f)) == FaceId.Empty);
+            Assert.IsTrue(pd.FaceAt(new(11f,11f)) == FaceId.Empty);
             
-            Assert.IsTrue(squareFace != FaceId.Empty);
+            // Split diagonally
+            pd.AddLine(_squareCorners[0], _squareCorners[2]);
+            Assert.IsTrue(pd.NumFaces==2);
+            Assert.IsTrue(pd.NumEdges==5);
+            Assert.IsTrue(pd.NumVertices==4);
+            var face1 = pd.FaceAt(new Vector2(1f, 9f));
+            var face2 = pd.FaceAt(new Vector2(9f, 1f));
+            Assert.IsTrue(face1!=FaceId.Empty);
+            Assert.IsTrue(face2!=FaceId.Empty);
+            Assert.IsTrue(face1!=face2);
             
-            var v3 = pd.AddVertex(new Vector2(15f, 5f));
-            pd.AddEdge(v1, v3);
-
-            Assert.IsTrue(squareFace == pd.FaceLeftOfEdge(v1, v2)); // Face stays the same
-            Assert.IsTrue(pd.FaceLeftOfEdge(v1, v3) == FaceId.Empty ); 
-            Assert.IsTrue(pd.FaceLeftOfEdge(v3, v1) == FaceId.Empty ); 
             
-            pd.AddEdge(v3, v2); // Complete the triangle attached to square
-            Assert.IsTrue(squareFace == pd.FaceLeftOfEdge(v1, v2)); // Face stays the same
-            var triangleFace = pd.FaceLeftOfEdge(v1, v3);
-            Assert.IsTrue(triangleFace != squareFace );            
-            Assert.IsTrue(triangleFace != FaceId.Empty );  
-            Assert.IsTrue(pd.FaceLeftOfEdge(v3, v1) == FaceId.Empty );
-            
-        }
-
-        [Test]
-        public void SplitSquare()
-        {
-            var (pd, vertices) = CreateSquare();
-         
-            Assert.IsTrue(pd.NumFaces() == 1);
-            pd.AddEdge(vertices[0],vertices[2]);
-            Assert.IsTrue(pd.NumFaces() == 2);
-            pd.AddEdge(vertices[1],vertices[3]);
-            Assert.IsTrue(pd.NumFaces() == 4);
-        }
-
-        [Test]
-        public void Transform()
-        {
-            var (pd, vertices) = CreateSquare();
-            
-            pd.TransformVertices( pos => pos + new Vector2(20f, 0f) );
-
-            Assert.IsTrue( pd.VertexAt(new Vector2(0f, 0f)) == null );
-            var v = pd.VertexAt(new Vector2(20f, 0f));
-            Assert.IsTrue( v != null );
-            Assert.IsTrue( AlmostSame( pd.VertexPosition(v), new Vector2(20f,0f)) );
-        }
-
-        [Test]
-        public void CombineTwoTriangles()
-        {
-            var pd = new PlanarDivision();
-            
-            VertexId[] vertices =
+            // split horizontal from middle of side edge
+            pd.AddLine(new(0f,5f), new(10f,5f));
+            Assert.IsTrue(pd.NumFaces==4);
+            Assert.IsTrue(pd.NumVertices==7);
+            Assert.IsTrue(pd.NumEdges==10);
+  
+            HashSet<FaceId> faces = new()
             {
-                pd.AddVertex(new Vector2(0f,0f)),
-                pd.AddVertex(new Vector2(1f,0f)),
-                pd.AddVertex(new Vector2(1f,1f)),
-                pd.AddVertex(new Vector2(5f,0f)),
-                pd.AddVertex(new Vector2(6f,0f)),
-                pd.AddVertex(new Vector2(6f,1f))
+                pd.FaceAt(new Vector2(1f, 9f)),
+                pd.FaceAt(new Vector2(9f, 1f)),
+                pd.FaceAt(new Vector2(1f, 2f)),
+                pd.FaceAt(new Vector2(6f, 5.1f))
             };
             
-            pd.AddEdge(vertices[0], vertices[1]);
-            pd.AddEdge(vertices[1], vertices[2]);
-            pd.AddEdge(vertices[2], vertices[0]);
-
-            pd.AddEdge(vertices[3], vertices[4]);
-            pd.AddEdge(vertices[4], vertices[5]);
-            pd.AddEdge(vertices[5], vertices[3]);
-
-            FaceId face1 = pd.FaceLeftOfEdge(vertices[0], vertices[1]);
-            FaceId face2 = pd.FaceLeftOfEdge(vertices[3], vertices[4]);
-            
-            Assert.IsTrue(face1 != face2);
-            Assert.IsTrue(face1 != FaceId.Empty);
-            Assert.IsTrue(face2 != FaceId.Empty);
-            Assert.IsTrue(pd.NumFaces() == 2);
-
-            pd.AddEdge(vertices[1], vertices[3]);
-            Assert.IsTrue(pd.NumFaces() == 2);
-            Assert.IsTrue(pd.FaceLeftOfEdge(vertices[1], vertices[3]) == FaceId.Empty);
-            Assert.IsTrue(pd.FaceLeftOfEdge(vertices[3], vertices[1]) == FaceId.Empty);
-            
+            Assert.IsTrue(faces.Count==4);
+            Assert.IsFalse(faces.Contains(FaceId.Empty));
         }
 
-        private (PlanarDivision, VertexId[]) CreateSquare()
+/*
+        [Test]
+        public void Groups()
         {
-            PlanarDivision pd = new PlanarDivision();
-
-            var v1 = pd.AddVertex( _squareCorners[0] );
-            var v2 = pd.AddVertex( _squareCorners[1] );
-            var v3 = pd.AddVertex( _squareCorners[2] );
-            var v4 = pd.AddVertex( _squareCorners[3] );
+            var pd = new PlanarDivision();
             
-            pd.AddEdge(v1, v2);
-            pd.AddEdge(v2, v3);
-            pd.AddEdge(v3, v4);
-            pd.AddEdge(v4, v1);
+            pd.AddLine(_squareCorners[0], _squareCorners[1]);
+            pd.AddLine(_squareCorners[1], _squareCorners[2]);
+            pd.AddLine(_squareCorners[2], _squareCorners[3]);
+            pd.AddLine(_squareCorners[3], _squareCorners[0]);
+            
+            pd.AddLine(_squareCorners2[0], _squareCorners2[1]);
+            pd.AddLine(_squareCorners2[1], _squareCorners2[2]);
+            pd.AddLine(_squareCorners2[2], _squareCorners2[3]);
+            pd.AddLine(_squareCorners2[3], _squareCorners2[0]);
+            
+            Assert.IsTrue(pd.NumFaces==2);
+            Assert.IsTrue(pd.NumEdges==8);
+            Assert.IsTrue(pd.NumVertices==8);
+            Assert.IsTrue(pd.NumGroups==2);
+            
+            pd.AddLine(_squareCorners[1], _squareCorners2[0]);
+            
+            Assert.IsTrue(pd.NumFaces==2);
+            Assert.IsTrue(pd.NumEdges==9);
+            Assert.IsTrue(pd.NumVertices==8);
+            Assert.IsTrue(pd.NumGroups==1);
+            
+            pd.AddLine(_squareCorners[2], _squareCorners2[3]);
+            
+            Assert.IsTrue(pd.NumFaces==3);
+            Assert.IsTrue(pd.NumEdges==10);
+            Assert.IsTrue(pd.NumVertices==8);
+            Assert.IsTrue(pd.NumGroups==1);
+            
+            pd.DeleteEdge(pd.VertexAt(_squareCorners[2]),pd.VertexAt(_squareCorners2[3]));
 
-            return (pd, new[] { v1, v2, v3, v4 });
+            Assert.IsTrue(pd.NumFaces==2);
+            Assert.IsTrue(pd.NumEdges==9);
+            Assert.IsTrue(pd.NumVertices==8);
+            Assert.IsTrue(pd.NumGroups==1);
+            
+            pd.DeleteEdge(pd.VertexAt(_squareCorners[1]),pd.VertexAt(_squareCorners2[0]));
+
+            Assert.IsTrue(pd.NumFaces==2);
+            Assert.IsTrue(pd.NumEdges==8);
+            Assert.IsTrue(pd.NumVertices==8);
+            Assert.IsTrue(pd.NumGroups==2);
         }
-        
-        private bool AlmostSame(Vector2 a, Vector2 b) => Vector2.Distance(a, b) < 0.0001f;
-        
-    
-        
+*/
+        [Test]
+        public void Holes()
+        {
+            var pd = PlanarDivisionPolygon(_squareCorners);
+
+            pd.AddLine(new Vector2(1f, 1f), new Vector2(2f, 1f));
+            pd.AddLine(new Vector2(2f, 1f), new Vector2(2f, 2f));
+            pd.AddLine(new Vector2(2f, 2f), new Vector2(1f, 1f));
+
+            Assert.IsTrue(pd.NumFaces == 2);
+            Assert.IsTrue(pd.NumEdges == 7);
+            Assert.IsTrue(pd.NumVertices == 7);
+            
+            FaceId face1 = pd.FaceAt(new Vector2(0.5f, 0.5f));
+            Assert.IsTrue(face1 != FaceId.Empty);
+            FaceId hole = pd.FaceAt(new Vector2(1.1f, 1.1f));
+            Assert.IsTrue(hole == FaceId.Empty);
+
+            Polygon poly = pd.FacePolygon(face1);
+            Assert.IsTrue(poly.NumHoles == 1);
+            
+            
+            pd.AddLine( new Vector2(5f, 1f), new Vector2(6f, 1f) );
+            pd.AddLine( new Vector2(6f, 1f), new Vector2(6f, 2f) );
+            pd.AddLine( new Vector2(6f, 2f), new Vector2(5f, 1f) );
+            face1 = pd.FaceAt(new Vector2(0.5f, 0.5f));
+            poly = pd.FacePolygon(face1);
+            Assert.IsTrue(poly.NumHoles == 2);
+            
+            // Face inside face inside face
+            pd.AddLine(new Vector2(1.5f, 1.5f), new Vector2(1.8f, 1.5f));
+            pd.AddLine(new Vector2(1.8f, 1.5f), new Vector2(1.8f, 1.8f));
+            pd.AddLine(new Vector2(1.8f, 1.8f), new Vector2(1.5f, 1.5f));
+            face1 = pd.FaceAt(new Vector2(0.5f, 0.5f));
+            poly = pd.FacePolygon(face1);
+            Assert.IsTrue(poly.NumHoles == 2);
+            
+            
+            var faces = pd.FacesIn(new Rect(new (-100f, -100f), new (200f, 200f)));
+            Assert.IsTrue(faces.Count() == 4);
+
+        }
+
+        private PlanarDivision PlanarDivisionPolygon(Vector2[] vertices)
+        {
+            var pd = new PlanarDivision();
+
+            pd.AddLine(vertices[0], vertices[1]);
+            pd.AddLine(vertices[1], vertices[2]);
+            pd.AddLine(vertices[2], vertices[3]);
+            pd.AddLine(vertices[3], vertices[0]);
+
+            return pd;
+        }
     }
 }
