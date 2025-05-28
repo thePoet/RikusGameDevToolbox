@@ -2,8 +2,7 @@
 using NUnit.Framework;
 using RikusGameDevToolbox.Geometry2d;
 using UnityEngine;
-using System.Collections.Generic;
-using System.Linq;
+
 
 namespace RikusGameDevToolbox.Tests
 {
@@ -49,7 +48,7 @@ namespace RikusGameDevToolbox.Tests
             square = square.Translate(new Vector2(5f, 5f));
             pd.AddPolygonOver(square, Color.blue);
             
-            Debug.Log("NumFaces: " + pd.NumFaces);
+            
             Assert.IsTrue(pd.NumFaces==2); 
             Assert.IsTrue(pd.NumEdges==10);
             Assert.IsTrue(pd.NumVertices==9);
@@ -59,19 +58,19 @@ namespace RikusGameDevToolbox.Tests
             Assert.IsTrue( IsColorAtPos(new Vector2(11f,11f), Color.blue));
 
 
-            var outer = pd.FaceLeftOfEdge(new Vector2(0f, 0f), new Vector2(0f, 10f));
-            pd.TryGetValue(outer, out Color c);
+            var redFace = pd.FaceLeftOfEdge(new Vector2(0f, 0f), new Vector2(10f, 0f));
+            pd.TryGetValue(redFace, out Color c);
             Assert.IsTrue(c == Color.red);
 
             var outside = pd.FaceLeftOfEdge(new Vector2(10f, 0f), new Vector2(0f, 0f));
             Assert.IsTrue(outside == FaceId.Empty);
 
-            var inner = pd.FaceLeftOfEdge(new Vector2(1f, 1f), new Vector2(2f, 1f));
-            pd.TryGetValue(outer, out Color c2);
+            var blueFace = pd.FaceLeftOfEdge(new Vector2(5f, 5f), new Vector2(10f, 5f));
+            pd.TryGetValue(blueFace, out Color c2);
             Assert.IsTrue(c2 == Color.blue);
 
-            
-            Assert.IsTrue( pd.FaceLeftOfEdge(new Vector2(2f, 1f), new Vector2(1f, 1f)) == inner );
+            Assert.IsTrue( pd.FaceLeftOfEdge(new Vector2(10f, 5f), new Vector2(5f, 5f)) == redFace );
+            Assert.IsTrue( pd.FaceLeftOfEdge(new Vector2(10f, 5f), new Vector2(15f, 5f)) == blueFace );
             
             
             bool IsColorAtPos(Vector2 pos, Color color) => pd.TryGetValue(pos, out Color c) && c == color;
@@ -90,8 +89,37 @@ namespace RikusGameDevToolbox.Tests
             Assert.IsTrue(pd.NumFaces==2); 
             Assert.IsTrue(pd.NumEdges==8);
             Assert.IsTrue(pd.NumVertices==8);
-            Assert.IsTrue( IsColorAtPos(new Vector2(5f,5f), Color.red));
-            Assert.IsTrue( IsColorAtPos(new Vector2(1.5f,1.5f), Color.blue));
+
+        
+            var blueFace = pd.FaceLeftOfEdge(new Vector2(1f, 1f), new Vector2(2f, 1f) );
+            var redFace = pd.FaceLeftOfEdge(new Vector2(2f, 1f), new Vector2(1f, 1f) );
+     
+            
+            Assert.IsTrue( IsColorAtPos(new Vector2(5f,5f), Color.red) );
+            Assert.IsTrue( IsColorAtPos(new Vector2(1.5f,1.5f), Color.blue) );
+            
+            pd.TryGetValue(blueFace, out Color c2);
+            Assert.IsTrue(c2 == Color.blue);
+            
+            pd.TryGetValue(redFace, out Color c3);
+            Assert.IsTrue(c3 == Color.red);
+            
+            
+            bool IsColorAtPos(Vector2 pos, Color color) => pd.TryGetValue(pos, out Color c) && c == color;
+        }
+
+        
+        [Test]
+        public void DeleteNestedFaces()
+        {
+            var pd = new PlanarDivision<Color>();
+
+            SimplePolygon square = new(_squareCorners);
+            pd.AddPolygonOver(square, Color.red);
+            SimplePolygon square2 = new(_smallSquareCorners);
+            pd.AddPolygonOver(square2, Color.blue);
+            
+            
             
             bool IsColorAtPos(Vector2 pos, Color color) => pd.TryGetValue(pos, out Color c) && c == color;
         }

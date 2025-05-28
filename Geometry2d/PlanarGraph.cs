@@ -62,7 +62,7 @@ namespace RikusGameDevToolbox.Geometry2d
 
         public int NumEdges => _edges.Count;
         public int NumVertices => _verticesById.Count;
-        public List<(VertexId, VertexId)> Edges => _edges.All().Select(e => (e.VertexA.Id, e.VertexB.Id)).ToList();
+        public List<(VertexId v1, VertexId v2)> Edges => _edges.All().Select(e => (e.VertexA.Id, e.VertexB.Id)).ToList();
         public List<VertexId> Vertices => _verticesById.Keys.ToList();
 
         /// <summary>

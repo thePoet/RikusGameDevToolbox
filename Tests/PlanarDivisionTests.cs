@@ -54,58 +54,28 @@ namespace RikusGameDevToolbox.Tests
             
             Assert.IsTrue(faces.Count==4);
             Assert.IsFalse(faces.Contains(FaceId.Empty));
-        }
-
-/*
-        [Test]
-        public void Groups()
-        {
-            var pd = new PlanarDivision();
             
-            pd.AddLine(_squareCorners[0], _squareCorners[1]);
-            pd.AddLine(_squareCorners[1], _squareCorners[2]);
-            pd.AddLine(_squareCorners[2], _squareCorners[3]);
-            pd.AddLine(_squareCorners[3], _squareCorners[0]);
-            
-            pd.AddLine(_squareCorners2[0], _squareCorners2[1]);
-            pd.AddLine(_squareCorners2[1], _squareCorners2[2]);
-            pd.AddLine(_squareCorners2[2], _squareCorners2[3]);
-            pd.AddLine(_squareCorners2[3], _squareCorners2[0]);
-            
-            Assert.IsTrue(pd.NumFaces==2);
-            Assert.IsTrue(pd.NumEdges==8);
-            Assert.IsTrue(pd.NumVertices==8);
-            Assert.IsTrue(pd.NumGroups==2);
-            
-            pd.AddLine(_squareCorners[1], _squareCorners2[0]);
-            
-            Assert.IsTrue(pd.NumFaces==2);
-            Assert.IsTrue(pd.NumEdges==9);
-            Assert.IsTrue(pd.NumVertices==8);
-            Assert.IsTrue(pd.NumGroups==1);
-            
-            pd.AddLine(_squareCorners[2], _squareCorners2[3]);
-            
+            // start deleting edges
+            pd.DeleteVertex(pd.VertexAt(new(10f,0f)));
             Assert.IsTrue(pd.NumFaces==3);
-            Assert.IsTrue(pd.NumEdges==10);
-            Assert.IsTrue(pd.NumVertices==8);
-            Assert.IsTrue(pd.NumGroups==1);
-            
-            pd.DeleteEdge(pd.VertexAt(_squareCorners[2]),pd.VertexAt(_squareCorners2[3]));
-
-            Assert.IsTrue(pd.NumFaces==2);
-            Assert.IsTrue(pd.NumEdges==9);
-            Assert.IsTrue(pd.NumVertices==8);
-            Assert.IsTrue(pd.NumGroups==1);
-            
-            pd.DeleteEdge(pd.VertexAt(_squareCorners[1]),pd.VertexAt(_squareCorners2[0]));
-
-            Assert.IsTrue(pd.NumFaces==2);
+            Assert.IsTrue(pd.NumVertices==6);
             Assert.IsTrue(pd.NumEdges==8);
-            Assert.IsTrue(pd.NumVertices==8);
-            Assert.IsTrue(pd.NumGroups==2);
+            
+            
+            pd.DeleteVertex(pd.VertexAt(new(0f,5f)));
+            Assert.IsTrue(pd.NumFaces==1);
+            Assert.IsTrue(pd.NumVertices==5);
+            Assert.IsTrue(pd.NumEdges==5);
+            
+            pd.DeleteDegenerateEdges();
+            Assert.IsTrue(pd.NumEdges==3);
+            
+            pd.DeleteVerticesWithoutEdges();
+            Assert.IsTrue(pd.NumVertices==3);
+            
         }
-*/
+
+
         [Test]
         public void Holes()
         {
@@ -121,8 +91,8 @@ namespace RikusGameDevToolbox.Tests
             
             FaceId face1 = pd.FaceAt(new Vector2(0.5f, 0.5f));
             Assert.IsTrue(face1 != FaceId.Empty);
-            FaceId hole = pd.FaceAt(new Vector2(1.1f, 1.1f));
-            Assert.IsTrue(hole == FaceId.Empty);
+            FaceId innerFace = pd.FaceAt(new Vector2(1.1f, 1.1f));
+            Assert.IsTrue(innerFace == face1);
 
             Polygon poly = pd.FacePolygon(face1);
             Assert.IsTrue(poly.NumHoles == 1);
@@ -143,11 +113,11 @@ namespace RikusGameDevToolbox.Tests
             poly = pd.FacePolygon(face1);
             Assert.IsTrue(poly.NumHoles == 2);
             
-            
             var faces = pd.FacesIn(new Rect(new (-100f, -100f), new (200f, 200f)));
             Assert.IsTrue(faces.Count() == 4);
 
         }
+
 
         private PlanarDivision PlanarDivisionPolygon(Vector2[] vertices)
         {

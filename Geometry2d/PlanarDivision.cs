@@ -9,30 +9,29 @@ namespace RikusGameDevToolbox.Geometry2d
 {
     public class PlanarDivision : PlanarGraph
     {
-        private enum FaceType
+        private abstract class Path : ISpatialData
         {
-            Normal,     
-            Boundary,   
-            Line
+            public HalfEdge HalfEdge; // Random half edge on the path
+            public Envelope Envelope { get; set; }
         }
-        
-        private class Face : ISpatialData
+
+        private class Face : Path
         {
             public FaceId Id;
-            public HalfEdge HalfEdge; // Random half edge of the face
-            public FaceType FaceType;
-            public Envelope Envelope { get; set; }
+            public List<OutsideFace> Holes;
+        }
 
-            public override string ToString()
-            {
-                return FaceType + " face " + Id.Value.ToString().Substring(0, 5);
-            }
+        private class OutsideFace : Path
+        {
+            public Face ContainingFace;
+           // public bool IsLine;
+            public bool IsContainedInFace => ContainingFace != null;
         }
 
         private class HalfEdge
         {
             public VertexId Origin; // Vertex at the origin of the half edge
-            public Face FaceOnLeft; // Face on the left side of the half edge
+            public Path Path; // Path that this half edge belongs to (Face or OutsideFace)
             public HalfEdge Twin; // Half edge with same vertices that goes in the opposite direction 
             public HalfEdge Next; // Next half edge in the boundary of LeftFace
             public HalfEdge Previous; // Previous half edge in the boundary of LeftFace
@@ -42,24 +41,19 @@ namespace RikusGameDevToolbox.Geometry2d
         
         private readonly Dictionary<VertexId, HalfEdge> _incidentEdge = new(); // Random half edge starting from the vertex
         private readonly Dictionary<FaceId, Face> _faces = new();
-        private readonly RTree<Face> _facesSpatial = new();
-        private readonly HashSet<HalfEdge> _halfEdges = new(); // Tarvitaanko?
+        private readonly RTree<Path> _paths = new();
+       // private readonly HashSet<HalfEdge> _halfEdges = new(); // Tarvitaanko?
        
         #region ----------------------------------------- PUBLIC PROPERTIES --------------------------------------------
        
-        public IEnumerable<FaceId> AllFaces() => _faces.Values.Where(face => face.FaceType==FaceType.Normal).Select(face => face.Id);
-        public FaceId FaceAt(Vector2 position) => NormalFacesAt(position).FirstOrDefault()?.Id ?? FaceId.Empty;
+        public IEnumerable<FaceId> AllFaces() => _faces.Keys;
+        public FaceId FaceAt(Vector2 position) => NormalFaceAt(position)?.Id ?? FaceId.Empty;
         public bool HasFace(FaceId faceId) => _faces.ContainsKey(faceId);
         public IEnumerable<FaceId> FacesIn(Rect rect) => NormalFacesIn(rect).Select(face => face.Id);
         public SimplePolygon FaceContour(FaceId faceId) => new SimplePolygon(FaceVertexPositions(_faces[faceId].HalfEdge));
         public Polygon FacePolygon(FaceId faceId) => FaceAsPolygon(_faces[faceId]);
-        public int NumFaces => _faces.Values.Count(face => face.FaceType==FaceType.Normal);
-        
-       
+        public int NumFaces => _faces.Values.Count;
 
-        internal bool IsNormalFace(FaceId faceId) => _faces.TryGetValue(faceId, out var face) && face.FaceType == FaceType.Normal;
-
-        
         #endregion
         #region ------------------------------------------ PUBLIC METHODS -----------------------------------------------
 
@@ -69,20 +63,31 @@ namespace RikusGameDevToolbox.Geometry2d
         
         public FaceId FaceLeftOfEdge(VertexId v1, VertexId v2)
         {
-            HalfEdge halfEdge = FindHalfEdge(v1, v2);
-            if (halfEdge == null) throw new ArgumentException("Tried to get face of edge that does not exist.");
-            return halfEdge.FaceOnLeft.Id;
+            HalfEdge halfEdge = GetHalfEdge(v1, v2);
+            if (halfEdge == null) throw new ArgumentException("Edge does not exist.");
+            return FaceOfPath(halfEdge.Path);
         }
         
         public FaceId FaceLeftOfEdge(Vector2 pos1, Vector2 pos2)
         {
-            return FaceLeftOfEdge(VertexAt(pos1), VertexAt(pos2));
+            var v1 = VertexAt(pos1);
+            var v2 = VertexAt(pos2);
+            if (v1 == null || v2 == null)
+            {
+                throw new ArgumentException("No vertex at given position.");
+            }
+            return FaceLeftOfEdge(v1,v2);
         }
 
         
         public void DeleteDegenerateEdges()
         {
-            throw new NotImplementedException();
+            Edges
+                .Where(edge => IsEdgeDegenerate(edge.v1, edge.v2))
+                .ToList()
+                .ForEach(edge => DeleteEdge(edge.Item1, edge.Item2));
+            
+            bool IsEdgeDegenerate(VertexId v1, VertexId v2) => GetHalfEdge(v1, v2).Path == GetHalfEdge(v2, v1).Path;
         }
 
         public override void TransformVertices(Func<Vector2, Vector2> transformFunction)
@@ -91,9 +96,9 @@ namespace RikusGameDevToolbox.Geometry2d
             
             foreach (var face in _faces.Values)
             {
-                _facesSpatial.Delete(face);
+                _paths.Delete(face);
                 face.Envelope = new Envelope(RectExtensions.CreateRectToEncapsulate(FaceVertexPositions(face.HalfEdge)));
-                _facesSpatial.Insert(face);
+                _paths.Insert(face);
             }
         }
         #endregion
@@ -138,7 +143,7 @@ namespace RikusGameDevToolbox.Geometry2d
         protected override void OnSplitEdge(VertexId v1, VertexId v2, VertexId newVertex)
         {
             _incidentEdge[newVertex] = null;
-            HalfEdge oldEdge = FindHalfEdge(v1, v2);
+            HalfEdge oldEdge = GetHalfEdge(v1, v2);
             if (oldEdge == null)
             {
                 throw new ArgumentException("Tried to split edge that does not exist.");
@@ -153,7 +158,7 @@ namespace RikusGameDevToolbox.Geometry2d
         
         protected override void OnDeleteEdge(VertexId v1, VertexId v2)
         {
-            HalfEdge halfEdge = FindHalfEdge(v1, v2);
+            HalfEdge halfEdge = GetHalfEdge(v1, v2);
             DeleteHalfEdgeTwins(halfEdge);
         }
 
@@ -184,69 +189,90 @@ namespace RikusGameDevToolbox.Geometry2d
             halfEdge1.Next.Previous = halfEdge1;
             halfEdge2.Next.Previous = halfEdge2;
             
-            _halfEdges.Add(halfEdge1);
-            _halfEdges.Add(halfEdge2);
+          //  _halfEdges.Add(halfEdge1);
+          //  _halfEdges.Add(halfEdge2);
             _incidentEdge[v1] = halfEdge1;
             _incidentEdge[v2] = halfEdge2;
 
             return (halfEdge1, halfEdge2);
+            
+            
+            // Returns next half edge CCW of vector origin -> target that is coming INTO the origin vertex 
+            // Null if there are no edges besides the given edge 
+            HalfEdge IncomingHalfEdgeCcwTo(VertexId origin, VertexId target)
+            {
+                Vector2 direction = Position(target) - Position(origin);
+          
+                var edge = EdgesOriginatingFrom(origin)
+                    .Where(he => he.Target != target) // Exclude self
+                    .OrderBy(he => direction.AngleCounterClockwise(Position(he.Target) - Position(he.Origin))) // CCW order
+                    .FirstOrDefault();
+
+                return edge?.Twin;
+            }
         }
         
 
 
         private void UpdateFacesAfterAddingHalfEdgePair(HalfEdge edge)
         {
-            if (IsOnlyEdgeAtOrigin(edge) && IsOnlyEdgeAtTarget(edge))
+            if (IsOnlyEdgeAtOrigin(edge) && IsOnlyEdgeAtTarget(edge)) // New unconnected edge, so create a new path:
             {
-                // New unconnected edge, so create a new face:
-                SetNewFaceOnHalfEdgesStartingFrom(edge);
+                CreateAndSetNewPathFrom(edge);
                 return;
             }
             
-            if (IsOnlyEdgeAtOrigin(edge))
+            if (IsOnlyEdgeAtOrigin(edge)) // Extend old path
             {
-                edge.FaceOnLeft = edge.Next.FaceOnLeft;
-                edge.Twin.FaceOnLeft = edge.Next.FaceOnLeft;
+                edge.Path = edge.Next.Path;
+                edge.Twin.Path = edge.Next.Path;
                 return;
             }
             
-            if (IsOnlyEdgeAtTarget(edge))
+            if (IsOnlyEdgeAtTarget(edge)) // Extend old path
             {
-                edge.FaceOnLeft = edge.Previous.FaceOnLeft;
-                edge.Twin.FaceOnLeft = edge.Previous.FaceOnLeft;
+                edge.Path = edge.Previous.Path;
+                edge.Twin.Path = edge.Previous.Path;
                 return;
             }
         
             
-            var face1 = edge.Next.FaceOnLeft;
-            var face2 = edge.Twin.Next.FaceOnLeft;
+            var path1 = edge.Next.Path;
+            var path2 = edge.Twin.Next.Path;
 
-            DeleteFace(face1);
+            DeletePath(path1);
             
-            if (face1 != face2) DeleteFace(face2);
+            if (path1 != path2) DeletePath(path2);
 
-            Face newFace1 = SetNewFaceOnHalfEdgesStartingFrom(edge);
-            Face newFace2 = null;
+            Path newPath1 = CreateAndSetNewPathFrom(edge);
+            Path newPath2 = null;
 
-            newFace2 = (edge.Twin.FaceOnLeft != newFace1) 
-                ? SetNewFaceOnHalfEdgesStartingFrom(edge.Twin) 
-                : newFace1; // In case both faces are the same. (Happens when two boundary faces are merged)
+            newPath2 = edge.Twin.Path != newPath1
+                ? CreateAndSetNewPathFrom(edge.Twin) 
+                : newPath1; // In case both faces are the same. (Happens when two boundary faces are merged)
            
-            if (face1==face2 && face1.FaceType == FaceType.Normal)
+            if (path1==path2 && path1 is Face face)
             {
-                OnFaceSplit(face1.Id, newFace1.Id, newFace2.Id);
+                if (newPath1 is Face newFace1 && newPath2 is Face newFace2)
+                {
+                    OnFaceSplit(face.Id, newFace1.Id, newFace2.Id);
+                }
+                else
+                {
+                    throw new Exception("Something went wrong when splitting two faces.");
+                }
             }
             
-            if (face1==face2 && face1.FaceType == FaceType.Boundary)
+            if (path1==path2 && path1 is OutsideFace outsideFace)
             {
-                if (newFace1.FaceType == FaceType.Normal && newFace2.FaceType == FaceType.Boundary)
+                if (newPath1 is Face face1 && newPath2 is OutsideFace)
                 {
-                    OnFaceCreated(newFace1.Id);
+                    OnFaceCreated(face1.Id);
                     return;
                 }
-                if (newFace2.FaceType == FaceType.Normal && newFace1.FaceType == FaceType.Boundary)
+                if (newPath2 is Face face2 && newPath1 is OutsideFace)
                 {
-                    OnFaceCreated(newFace2.Id);
+                    OnFaceCreated(face2.Id);
                     return;
                 }
                 throw new Exception("Something went wrong when combining two boundary faces.");
@@ -270,12 +296,12 @@ namespace RikusGameDevToolbox.Geometry2d
             
             newHalfEdge1.Origin = newVertex;
             newHalfEdge1.Previous = edge;
-            newHalfEdge1.FaceOnLeft = edge.FaceOnLeft;
+            newHalfEdge1.Path = edge.Path;
             newHalfEdge1.Next = (edge.Next == edge.Twin) ? newHalfEdge2 : edge.Next;
             
             newHalfEdge2.Origin = edge.Target;
             newHalfEdge2.Previous = edge.Twin.Previous == edge ? newHalfEdge1 : edge.Twin.Previous;
-            newHalfEdge2.FaceOnLeft = edge.Twin.FaceOnLeft;
+            newHalfEdge2.Path = edge.Twin.Path;
             newHalfEdge2.Next = edge.Twin;
 
             edge.Twin.Previous.Next = newHalfEdge2;
@@ -285,8 +311,8 @@ namespace RikusGameDevToolbox.Geometry2d
             edge.Twin.Previous = newHalfEdge2;
             edge.Twin.Origin = newVertex;
 
-            _halfEdges.Add(newHalfEdge1);
-            _halfEdges.Add(newHalfEdge2);
+        //    _halfEdges.Add(newHalfEdge1);
+        //    _halfEdges.Add(newHalfEdge2);
         }
         
         private void DeleteHalfEdgeTwins(HalfEdge edge)
@@ -316,27 +342,27 @@ namespace RikusGameDevToolbox.Geometry2d
                 _incidentEdge[edge.Target] = edge.Next;
             }
 
-            _halfEdges.Remove(edge); 
-            _halfEdges.Remove(edge.Twin);
+        //    _halfEdges.Remove(edge); 
+        //    _halfEdges.Remove(edge.Twin);
             
             // Update faces:
             
-            var faceLeft = edge.FaceOnLeft;
-            var faceRight = edge.Twin.FaceOnLeft;
+            var faceLeft = edge.Path;
+            var faceRight = edge.Twin.Path;
             
-            DeleteFace(faceLeft);
-            if (faceLeft != faceRight) DeleteFace(faceRight);
+            DeletePath(faceLeft);
+            if (faceLeft != faceRight) DeletePath(faceRight);
 
-            Face newFace1 = null;
+            Path newFace1 = null;
 
             if (!onlyEdgeFromOrigin)
             {
-                newFace1 = SetNewFaceOnHalfEdgesStartingFrom(edge.Previous);
+                newFace1 = CreateAndSetNewPathFrom(edge.Previous);
             }
 
-            if (!onlyEdgeFromTarget && edge.Next.FaceOnLeft != newFace1)
+            if (!onlyEdgeFromTarget && edge.Next.Path != newFace1)
             {
-                SetNewFaceOnHalfEdgesStartingFrom(edge.Next);
+                CreateAndSetNewPathFrom(edge.Next);
             }
 
             if (!onlyEdgeFromTarget && !onlyEdgeFromOrigin)
@@ -347,61 +373,89 @@ namespace RikusGameDevToolbox.Geometry2d
         }
 
 
-        private Face SetNewFaceOnHalfEdgesStartingFrom(HalfEdge startEdge)
+        private Path CreateAndSetNewPathFrom(HalfEdge startEdge)
         {
-            var face = new Face
+            Path path = HasArea(startEdge) && IsCcw(startEdge)
+                ? CreateFace(startEdge)
+                : CreateOutsideFace(startEdge);
+            
+            
+            foreach (var edge  in PathHalfEdges(startEdge))
             {
-                Id = FaceId.New(),
-                HalfEdge = startEdge
-            };
-            foreach (var edge  in FaceHalfEdges(startEdge))
-            {
-                edge.FaceOnLeft = face;
+                edge.Path = path;
             }
-            face.FaceType = GetFaceType(startEdge);
-            
-            UpdateFaceEnvelope(face);
-            _facesSpatial.Insert(face);
-            _faces.Add(face.Id, face);
 
-            return face;
-            
-            FaceType GetFaceType(HalfEdge startEdge)
+            _paths.Insert(path);
+            if (path is Face face) _faces.Add(face.Id, face);
+
+            return path;
+
+            Face CreateFace(HalfEdge start)
             {
-                if (FaceHalfEdges(startEdge).All(edge => edge.FaceOnLeft == edge.Twin.FaceOnLeft)) return FaceType.Line;
-                if (GeometryUtils.IsClockwise(FaceVertexPositions(startEdge))) return FaceType.Boundary;
-                return FaceType.Normal;
-            }        
+                Face newFace = new Face()
+                {
+                    Id = FaceId.New(),
+                    HalfEdge = start
+                };
+                UpdateFaceEnvelope(newFace);
+                newFace.Holes = HolesInsideFace(newFace);
+                newFace.Holes?.ForEach(hole => hole.ContainingFace = newFace);
+                return newFace;
+            }
+
+            OutsideFace CreateOutsideFace(HalfEdge start)
+            {
+                OutsideFace outsideFace = new OutsideFace();
+                outsideFace.HalfEdge = start;
+                UpdateFaceEnvelope(outsideFace);
+                outsideFace.ContainingFace = FaceContainingOutsideFace(outsideFace);
+                if (outsideFace.ContainingFace != null)
+                {
+                    if (outsideFace.ContainingFace.Holes == null)
+                        outsideFace.ContainingFace.Holes = new List<OutsideFace>();
+                    outsideFace.ContainingFace.Holes.Add(outsideFace);
+                }
+                
+                Debug.Log("Created outside face with containing face: " + outsideFace.ContainingFace?.Id);
+                return outsideFace;
+            }
+            
+            bool IsCcw(HalfEdge start) => !GeometryUtils.IsClockwise(FaceVertexPositions(start));
+
+            bool HasArea(HalfEdge start) => PathHalfEdges(start).Any(e => !PathHalfEdges(start).Contains(e.Twin));
         }
 
         
-        private void DeleteFace(Face face)
+        private void DeletePath(Path path)
         {
-            _faces.Remove(face.Id);
-            if (!_facesSpatial.Delete(face)) throw new InvalidOperationException("Could not delete face from spatial collection.");
+            if (!_paths.Delete(path)) throw new InvalidOperationException("Could not delete path from spatial collection.");
+            
+            if (path is Face face)
+            {
+                _faces.Remove(face.Id);
+                if (face.Holes != null)
+                {
+                    foreach (OutsideFace hole in face.Holes)
+                    {
+                        hole.ContainingFace = FaceContainingOutsideFace(hole);
+                    }
+                }
+            }
+
+            if (path is OutsideFace { ContainingFace: not null } outsideFace)
+            {
+                outsideFace.ContainingFace.Holes?.Remove(outsideFace);
+            }
         }
 
-        
-        // Returns next half edge CCW of origin -> target that is coming INTO the origin vertex 
-        // Null if there are no edges besides the given edge 
-        private HalfEdge IncomingHalfEdgeCcwTo(VertexId origin, VertexId target)
-        {
-            Vector2 direction = Position(target) - Position(origin);
-          
-            var edge = EdgesOriginatingFrom(origin)
-                .Where(he => he.Target != target) // Exclude self
-                .OrderBy(he => direction.AngleCounterClockwise(Position(he.Target) - Position(he.Origin))) // CCW order
-                .FirstOrDefault();
 
-            return edge?.Twin;
-        }
-        
 
         private List<HalfEdge> EdgesOriginatingFrom(VertexId vertex)
         {
             var result = new List<HalfEdge>();
+            if (_incidentEdge.TryGetValue(vertex, out var halfEdge) == false) return result; // No edges 
             
-            var halfEdge = _incidentEdge[vertex];
+           // var halfEdge = _incidentEdge[vertex];
             if (halfEdge == null) return result;
             int i = 0;
             do
@@ -415,30 +469,34 @@ namespace RikusGameDevToolbox.Geometry2d
             return result;
         }
         
-        private List<Face> NormalFacesAt(Vector2 position)
+        private Face NormalFaceAt(Vector2 position)
         {
-            return _facesSpatial.Search(position)
-                .Where(face => face.FaceType == FaceType.Normal && IsPointOnFace(position, face))
-                .ToList();
+            return _paths.Search(position)
+                .OfType<Face>()
+                .Where(face => IsPointInsidePath(position, face))
+                .OrderBy(face => face.Envelope.Area) // Return the smallest face that contains the point
+                .FirstOrDefault();
         }
         
         private List<Face> NormalFacesIn(Rect rect)
         {
-            return _facesSpatial.Search(rect)
-                .Where(face => face.FaceType == FaceType.Normal && IsFaceAtLeastPartiallyInRectangle(face, rect))
+            return _paths.Search(rect)
+                .OfType<Face>()
+                .Where(face => IsFaceAtLeastPartiallyInRectangle(face, rect))
                 .ToList();
         }
         
-        private List<Face> BoundaryFacesAt(Vector2 position)
+        private List<OutsideFace> OutsideFacesAt(Vector2 position)
         {
-            return _facesSpatial.Search(position)
-                .Where(face => face.FaceType == FaceType.Boundary && IsPointInsideFaceContour(position, face))
+            return _paths.Search(position)
+                .OfType<OutsideFace>()
+                .Where(outsideFace => IsPointInsidePath(position, outsideFace))
                 .ToList();
         }
         
  
 
-        private HalfEdge FindHalfEdge(VertexId origin, VertexId target)
+        private HalfEdge GetHalfEdge(VertexId origin, VertexId target)
         {
             return EdgesOriginatingFrom(origin).FirstOrDefault(he => he.Target == target);
         }
@@ -446,10 +504,10 @@ namespace RikusGameDevToolbox.Geometry2d
 
         private IEnumerable<Vector2> FaceVertexPositions(HalfEdge halfEdge)
         {
-           return FaceHalfEdges(halfEdge).Select(he => Position(he.Origin));
+           return PathHalfEdges(halfEdge).Select(he => Position(he.Origin));
         }
 
-        private IEnumerable<HalfEdge> FaceHalfEdges(HalfEdge first)
+        private IEnumerable<HalfEdge> PathHalfEdges(HalfEdge first)
         {
             var current = first;
             for (int i = 0; i < 10000; i++)
@@ -465,10 +523,12 @@ namespace RikusGameDevToolbox.Geometry2d
         private Polygon FaceAsPolygon(Face face)
         {
             var paths = new List<List<Vector2>> { FaceVertexPositions(face.HalfEdge).ToList() };
-            
-            foreach (Face hole in HolesInFace(face))
+            if (face.Holes != null)
             {
-                paths.Add(FaceVertexPositions(hole.HalfEdge).ToList());
+                foreach (OutsideFace hole in face.Holes)
+                {
+                    paths.Add(FaceVertexPositions(hole.HalfEdge).ToList());
+                }
             }
 
             List<Polygon> polygons = Polygon.CreateFromPaths(paths);
@@ -479,50 +539,65 @@ namespace RikusGameDevToolbox.Geometry2d
         /// <summary>
         ///  Returns boundary faces inside the face. Note: only the first level of holes are returned, not holes inside the holes
         /// </summary>
-        private List<Face> HolesInFace(Face face)
+        private List<OutsideFace> HolesInsideFace(Face face)
         {
-            var holes = _facesSpatial.Search(face.Envelope)
-                .Where(f => f.FaceType == FaceType.Boundary && IsFaceInside(f, face))
+            var holes = _paths.Search(face.Envelope)
+                .OfType<OutsideFace>()
+                .Where(f =>  IsPathsInsideAnother(f, face))
                 .ToList();
           
             // Remove holes that are inside other holes
-            var copy = new List<Face>(holes);
-            foreach (Face f in copy)
+            var copy = new List<Path>(holes);
+            foreach (Path f in copy)
             {
-                holes.RemoveAll(hole => hole != f && IsFaceInside(hole, f));
+                holes.RemoveAll(hole => hole != f && IsPathsInsideAnother(hole, f));
             }
 
-            return holes;
+            return holes.Any() ? holes : null;
         }
 
-        private bool IsFaceAtLeastPartiallyInRectangle(Face face, Rect rect)
+        /// <summary>
+        ///  Returns the smallest normal face that contains the outside face, or null if it is not contained in any face.
+        /// </summary>
+        private Face FaceContainingOutsideFace(OutsideFace outsideFace)
         {
-            return FaceHalfEdges(face.HalfEdge)
+            return _paths.Search(Position(outsideFace.HalfEdge.Origin))
+                .OfType<Face>()
+                .Where(face => IsPathsInsideAnother(outsideFace, face))
+                .OrderBy(face => face.Envelope.Area)
+                .FirstOrDefault();
+        }
+
+        private bool IsFaceAtLeastPartiallyInRectangle(Path face, Rect rect)
+        {
+            return PathHalfEdges(face.HalfEdge)
                 .Any(edge => Intersection.LineSegmentRectangle(Position(edge.Origin), Position(edge.Target), rect));
         }
         
-        private bool IsFaceInside(Face face, Face containerFace)
+        private bool IsPathsInsideAnother(Path path, Path anotherPath)
         {
             //Assuming the edges do not cross, we can just check if all vertices of a are inside b
-              return FaceVertexPositions(face.HalfEdge)  
-                .All(vPos => IsPointInsideFaceContour(vPos, containerFace));
+              return FaceVertexPositions(path.HalfEdge)  
+                .All(vPos => IsPointInsidePath(vPos, anotherPath));
         }
 
-        private bool IsPointInsideFaceContour(Vector2 position, Face face)
+        private bool IsPointInsidePath(Vector2 position, Path path)
         {
-            var polygon = face.FaceType != FaceType.Boundary ? new SimplePolygon(FaceVertexPositions(face.HalfEdge)) : 
-                new SimplePolygon(FaceVertexPositions(face.HalfEdge).Reverse());
-            
+            var polygon = path is Face
+                ? new SimplePolygon(FaceVertexPositions(path.HalfEdge)) 
+                : new SimplePolygon(FaceVertexPositions(path.HalfEdge).Reverse());
             return polygon.IsPointInside(position);
         }
-        
-        private bool IsPointOnFace(Vector2 position, Face face)
+ 
+        /// <summary> Returns the Id of the face that the path belongs to as either a contour or a hole.</summary>
+        private FaceId FaceOfPath(Path path)
         {
-            if (face.FaceType == FaceType.Boundary) return !FaceAsPolygon(face).IsPointInside(position);
-            return FaceAsPolygon(face).IsPointInside(position);
+            if (path is Face face) return face.Id;
+            if (path is OutsideFace { ContainingFace: not null } outsideFace) return outsideFace.ContainingFace.Id;
+            return FaceId.Empty;
         }
         
-        private void UpdateFaceEnvelope(Face face)
+        private void UpdateFaceEnvelope(Path face)
         {
             face.Envelope = new Envelope( RectExtensions.CreateRectToEncapsulate(FaceVertexPositions(face.HalfEdge)) );
         }

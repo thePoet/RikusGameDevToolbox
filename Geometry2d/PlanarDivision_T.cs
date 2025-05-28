@@ -45,18 +45,21 @@ namespace RikusGameDevToolbox.Geometry2d
             return _faceValues.Remove(faceId);
         }
 
+        // Deletes
+        public void DeleteFace(FaceId faceId)
+        {
+            
+        }
+
         /// <summary>
         /// Adds a polygon to the planar division and sets the value of the face inside it.
         /// It's "drawn over" the existing faces and all the edges and vertices inside it are deleted.
         /// </summary>
         public void AddPolygonOver(Polygon polygon, T value)
         {
-            //TODO: Move partly to the PlanarGraph
-            
             // Draw the edges of the polygon and store the vertices on them:
             HashSet<VertexId> verticesOnEdges = new();
-            
-           
+
             List<VertexId> verticesOnFirstEdge = new();
             
             foreach ((Vector2 p1, Vector2 p2) in polygon.Edges())
@@ -79,13 +82,8 @@ namespace RikusGameDevToolbox.Geometry2d
       
             // Set the value:
 
-
             FaceId faceId = FaceLeftOfEdge(verticesOnFirstEdge[0], verticesOnFirstEdge[1]);
-            Debug.Log("FaceId: " + faceId);
-            Debug.Log("IsNormal: " + IsNormalFace(faceId));
-            FaceId faceId2 = FaceLeftOfEdge(verticesOnFirstEdge[1], verticesOnFirstEdge[0]);
-            Debug.Log("Is inverse Normal: " + IsNormalFace(faceId2));
-
+            Debug.Log("POL FACE: " + faceId);
             
             SetValue(faceId, value);
 
