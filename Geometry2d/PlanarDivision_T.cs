@@ -64,7 +64,7 @@ namespace RikusGameDevToolbox.Geometry2d
             
             foreach ((Vector2 p1, Vector2 p2) in polygon.Edges())
             {
-                var verticesOnEdge = AddLine(p1, p2);
+                var verticesOnEdge = PlanarGraph.AddLine(p1, p2);
                 verticesOnEdges.UnionWith(verticesOnEdge);
                 if (verticesOnFirstEdge.Count == 0)
                 {
@@ -74,10 +74,10 @@ namespace RikusGameDevToolbox.Geometry2d
             
 
             // Vertices that are inside the polygon, not on the edges will be deleted:
-            VerticesIn(polygon.Bounds())
-                .Where(v => polygon.IsPointInside(Position(v)) && !verticesOnEdges.Contains(v))
+            PlanarGraph.VerticesIn(polygon.Bounds())
+                .Where(v => polygon.IsPointInside(PlanarGraph.Position(v)) && !verticesOnEdges.Contains(v))
                 .ToList()
-                .ForEach(DeleteVertex);
+                .ForEach(PlanarGraph.DeleteVertex);
 
       
             // Set the value:

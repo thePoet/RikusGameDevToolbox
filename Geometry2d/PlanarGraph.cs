@@ -9,14 +9,21 @@ namespace RikusGameDevToolbox.Geometry2d
 {
     /// <summary>
     /// This class represents a planar graph, which is a collection of vertices and edges in a 2D space. The edges
-    /// never cross. If a new edge is added that intersects with existing edges, the existing edges are split and new
+    /// never cross. If a new edge is added that intersects with existing edge, the edges are split and new
     /// vertices are created in the intersection points. The edges and vertices are stored in spatial structures for
     /// fast search.
     /// </summary>
     public class PlanarGraph
     {
-    
-
+        public class ObserverMethods
+        {
+            public Action<VertexId> OnAddVertex;
+            public Action<VertexId, VertexId> OnAddEdge;
+            public Action<VertexId, VertexId, VertexId> OnSplitEdge; 
+            public Action<VertexId> OnDeleteVertex;
+            public Action<VertexId, VertexId> OnDeleteEdge;
+        }
+        
         private class Vertex
         {
             public VertexId Id;
@@ -47,16 +54,12 @@ namespace RikusGameDevToolbox.Geometry2d
             }
         }
 
+        public readonly ObserverMethods Observers = new();
+
         private readonly float _epsilon;
         private readonly SpatialCollection2d<Vertex> _vertices = new();
         private readonly Dictionary<VertexId, Vertex> _verticesById = new();
         private readonly RTree<Edge> _edges = new();
-
-        private Action<VertexId> _onAddVertex;
-        private Action<VertexId, VertexId> _onAddEdge;
-        private Action<VertexId, VertexId, VertexId> _onSplitEdge; 
-        private Action<VertexId> _onDeleteVertex;
-        private Action<VertexId, VertexId> _onDeleteEdge;
 
         #region ----------------------------------- PUBLIC METHODS & PROPERTIES ----------------------------------------
 
@@ -65,26 +68,14 @@ namespace RikusGameDevToolbox.Geometry2d
         public List<(VertexId v1, VertexId v2)> Edges => _edges.All().Select(e => (e.VertexA.Id, e.VertexB.Id)).ToList();
         public List<VertexId> Vertices => _verticesById.Keys.ToList();
 
+
         /// <summary>
         /// 
         /// </summary>
         /// <param name="epsilon">Vertices closer than epsilon are considered the same vertex.</param>
-        /// <param name="onAddVertex">Action called after adding a vertex</param>
-        /// <param name="onAddEdge">Action called after adding an edge</param>
-        /// <param name="onSplitEdge">Action called after a vertex is inserted on an edge. First two parameters
-        /// are verices of the edge. Note that in this case "onAddVertex" and "onAddEdge" are not called </param>
-        /// <param name="onDeleteVertex">Action called after vertex is deleted</param>
-        /// <param name="onDeleteEdge">Action called after edge is deleted</param>
-        public PlanarGraph(float epsilon = 0.0001f,Action<VertexId> onAddVertex = null, Action<VertexId, 
-                VertexId> onAddEdge = null, Action<VertexId, VertexId, VertexId> onSplitEdge = null, 
-            Action<VertexId> onDeleteVertex = null, Action<VertexId, VertexId> onDeleteEdge = null)
+        public PlanarGraph(float epsilon = 0.0001f)
         {
             _epsilon = epsilon;
-            _onAddVertex = onAddVertex;
-            _onAddEdge = onAddEdge;
-            _onSplitEdge = onSplitEdge;
-            _onDeleteVertex = onDeleteVertex;
-            _onDeleteEdge = onDeleteEdge;
         }
         
         public void Clear()
@@ -185,7 +176,7 @@ namespace RikusGameDevToolbox.Geometry2d
 
             _verticesById.Remove(id);
             _vertices.Remove(vertex.Position, vertex);
-            OnDeleteVertex(id);
+            Observers.OnDeleteVertex?.Invoke(id);
         }
 
         public void DeleteVerticesWithoutEdges()
@@ -266,31 +257,7 @@ namespace RikusGameDevToolbox.Geometry2d
 
         
         #endregion
-        #region ------------------------------------------ PROTECTED METHODS ----------------------------------------------
 
-        
-        protected virtual void OnAddVertex(VertexId vertex)
-        {
-            if (_onAddVertex != null) _onAddVertex(vertex);
-        } 
-        protected virtual void OnAddEdge(VertexId vertexA, VertexId vertexB)
-        {
-            if (_onAddEdge != null) _onAddEdge(vertexA, vertexB);
-        }
-        protected virtual void OnSplitEdge(VertexId vertexA, VertexId vertexB, VertexId newVertex)
-        {
-            if (_onSplitEdge != null) _onSplitEdge(vertexA, vertexB, newVertex);
-        }
-        protected virtual void OnDeleteVertex(VertexId vertex)
-        {
-            if (_onDeleteVertex != null) _onDeleteVertex(vertex);
-        }
-        protected virtual void OnDeleteEdge(VertexId vertexA, VertexId vertexB)
-        {
-            if (_onDeleteEdge != null) _onDeleteEdge(vertexA, vertexB);
-        }
-        
-        #endregion
 
         #region ------------------------------------------ PRIVATE METHODS ----------------------------------------------
 
@@ -312,7 +279,7 @@ namespace RikusGameDevToolbox.Geometry2d
             };
             _vertices.Add(newVertex.Position, newVertex);
             _verticesById[newVertex.Id] = newVertex;
-            OnAddVertex(newVertex.Id);
+            Observers.OnAddVertex?.Invoke(newVertex.Id);
             return newVertex;
           
         }
@@ -329,7 +296,7 @@ namespace RikusGameDevToolbox.Geometry2d
             
             _edges.Insert(edge);
 
-            OnAddEdge(vertexA.Id, vertexB.Id);
+            Observers.OnAddEdge?.Invoke(vertexA.Id, vertexB.Id);
         }
         
         private void DeleteEdge(Edge edge)
@@ -337,7 +304,8 @@ namespace RikusGameDevToolbox.Geometry2d
             edge.VertexA.Edges.Remove(edge);
             edge.VertexB.Edges.Remove(edge);
             _edges.Delete(edge);
-            OnDeleteEdge(edge.VertexA.Id, edge.VertexB.Id);
+            
+            Observers.OnDeleteEdge?.Invoke(edge.VertexA.Id, edge.VertexB.Id);
         }
         
         private Vertex InsertVertexOnEdge(Edge edge, Vector2 position)
@@ -370,7 +338,7 @@ namespace RikusGameDevToolbox.Geometry2d
             edge2.VertexB.Edges.Add(edge2);
             _edges.Insert(edge2);
             
-            OnSplitEdge(oldEdge.VertexA.Id, oldEdge.VertexB.Id, newVertex.Id);
+            Observers.OnSplitEdge?.Invoke(oldEdge.VertexA.Id, oldEdge.VertexB.Id, newVertex.Id);
             
             return newVertex;
         }

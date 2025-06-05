@@ -7,7 +7,7 @@ using UnityEngine;
 
 namespace RikusGameDevToolbox.Geometry2d
 {
-    public class PlanarDivision : PlanarGraph
+    public class PlanarDivision 
     {
         private abstract class Path : ISpatialData
         {
@@ -37,7 +37,8 @@ namespace RikusGameDevToolbox.Geometry2d
             public HalfEdge Previous; // Previous half edge in the boundary of LeftFace
             public VertexId Target => Twin.Origin; 
         }
-        
+
+        protected readonly PlanarGraph PlanarGraph;
         
         private readonly Dictionary<VertexId, HalfEdge> _incidentEdge = new(); // Random half edge starting from the vertex
         private readonly Dictionary<FaceId, Face> _faces = new();
@@ -53,12 +54,29 @@ namespace RikusGameDevToolbox.Geometry2d
         public SimplePolygon FaceContour(FaceId faceId) => new SimplePolygon(FaceVertexPositions(_faces[faceId].HalfEdge));
         public Polygon FacePolygon(FaceId faceId) => FaceAsPolygon(_faces[faceId]);
         public int NumFaces => _faces.Values.Count;
+        public int NumEdges => PlanarGraph.Edges.Count;
+        public int NumVertices => PlanarGraph.Vertices.Count;
+        public void AddLine(Vector2 v1, Vector2 v2) => PlanarGraph.AddLine(v1, v2);
+        public void DeleteVerticesWithoutEdges() => PlanarGraph.DeleteVerticesWithoutEdges();
+    
+
 
         #endregion
         #region ------------------------------------------ PUBLIC METHODS -----------------------------------------------
 
-        public PlanarDivision(float epsilon = 0.00001f) : base(epsilon)
+        public PlanarDivision(float epsilon = 0.00001f) 
         {
+            PlanarGraph = new PlanarGraph(epsilon)
+            {
+                Observers =
+                {
+                    OnAddVertex = OnAddVertex,
+                    OnAddEdge = OnAddEdge,
+                    OnSplitEdge = OnSplitEdge,
+                    OnDeleteVertex = OnDeleteVertex,
+                    OnDeleteEdge = OnDeleteEdge
+                }
+            };
         }
         
         public FaceId FaceLeftOfEdge(VertexId v1, VertexId v2)
@@ -70,8 +88,8 @@ namespace RikusGameDevToolbox.Geometry2d
         
         public FaceId FaceLeftOfEdge(Vector2 pos1, Vector2 pos2)
         {
-            var v1 = VertexAt(pos1);
-            var v2 = VertexAt(pos2);
+            var v1 = PlanarGraph.VertexAt(pos1);
+            var v2 = PlanarGraph.VertexAt(pos2);
             if (v1 == null || v2 == null)
             {
                 throw new ArgumentException("No vertex at given position.");
@@ -82,17 +100,17 @@ namespace RikusGameDevToolbox.Geometry2d
         
         public void DeleteDegenerateEdges()
         {
-            Edges
+            PlanarGraph.Edges
                 .Where(edge => IsEdgeDegenerate(edge.v1, edge.v2))
                 .ToList()
-                .ForEach(edge => DeleteEdge(edge.Item1, edge.Item2));
+                .ForEach(edge => PlanarGraph.DeleteEdge(edge.Item1, edge.Item2));
             
             bool IsEdgeDegenerate(VertexId v1, VertexId v2) => GetHalfEdge(v1, v2).Path == GetHalfEdge(v2, v1).Path;
         }
 
-        public override void TransformVertices(Func<Vector2, Vector2> transformFunction)
+        public void TransformVertices(Func<Vector2, Vector2> transformFunction)
         {
-            base.TransformVertices(transformFunction);
+            PlanarGraph.TransformVertices(transformFunction);
             
             foreach (var face in _faces.Values)
             {
@@ -101,6 +119,15 @@ namespace RikusGameDevToolbox.Geometry2d
                 _paths.Insert(face);
             }
         }
+
+        public bool DeleteVertex(Vector2 position)
+        {
+            var id = PlanarGraph.VertexAt(position);
+            if (id == null) return false;
+            PlanarGraph.DeleteVertex(id);
+            return true;
+        }
+            
         #endregion
         #region ---------------------------------------- PROTECTED METHODS ---------------------------------------------
 
@@ -119,28 +146,23 @@ namespace RikusGameDevToolbox.Geometry2d
             
         }
 
-        protected virtual void OnFaceDeformed(FaceId faceId)          // ehkä   
-        {
-        }
-        
         protected virtual void OnFaceDestroyed(FaceId faceId)
         {
             
         }
         
-        protected override void OnAddVertex(VertexId vertexId)
+        private void OnAddVertex(VertexId vertexId)
         {
             _incidentEdge[vertexId] = null;
         }
         
-        protected override void OnAddEdge(VertexId v1, VertexId v2)
+        private void OnAddEdge(VertexId v1, VertexId v2)
         {
-            base.OnAddEdge(v1, v2);
             var (halfEdge1, halfEdge2) = AddHalfEdgePairBetweenVertices(v1, v2);
             UpdateFacesAfterAddingHalfEdgePair(halfEdge1);
         }
         
-        protected override void OnSplitEdge(VertexId v1, VertexId v2, VertexId newVertex)
+        private void OnSplitEdge(VertexId v1, VertexId v2, VertexId newVertex)
         {
             _incidentEdge[newVertex] = null;
             HalfEdge oldEdge = GetHalfEdge(v1, v2);
@@ -151,12 +173,12 @@ namespace RikusGameDevToolbox.Geometry2d
             InsertVertexIntoEdge(oldEdge, newVertex);
         }
 
-        protected override void OnDeleteVertex(VertexId vertexId)
+        private void OnDeleteVertex(VertexId vertexId)
         {
             _incidentEdge.Remove(vertexId);
         }
         
-        protected override void OnDeleteEdge(VertexId v1, VertexId v2)
+        private void OnDeleteEdge(VertexId v1, VertexId v2)
         {
             HalfEdge halfEdge = GetHalfEdge(v1, v2);
             DeleteHalfEdgeTwins(halfEdge);
@@ -201,11 +223,11 @@ namespace RikusGameDevToolbox.Geometry2d
             // Null if there are no edges besides the given edge 
             HalfEdge IncomingHalfEdgeCcwTo(VertexId origin, VertexId target)
             {
-                Vector2 direction = Position(target) - Position(origin);
+                Vector2 direction = PlanarGraph.Position(target) - PlanarGraph.Position(origin);
           
                 var edge = EdgesOriginatingFrom(origin)
                     .Where(he => he.Target != target) // Exclude self
-                    .OrderBy(he => direction.AngleCounterClockwise(Position(he.Target) - Position(he.Origin))) // CCW order
+                    .OrderBy(he => direction.AngleCounterClockwise(PlanarGraph.Position(he.Target) - PlanarGraph.Position(he.Origin))) // CCW order
                     .FirstOrDefault();
 
                 return edge?.Twin;
@@ -504,7 +526,7 @@ namespace RikusGameDevToolbox.Geometry2d
 
         private IEnumerable<Vector2> FaceVertexPositions(HalfEdge halfEdge)
         {
-           return PathHalfEdges(halfEdge).Select(he => Position(he.Origin));
+           return PathHalfEdges(halfEdge).Select(he => PlanarGraph.Position(he.Origin));
         }
 
         private IEnumerable<HalfEdge> PathHalfEdges(HalfEdge first)
@@ -561,7 +583,7 @@ namespace RikusGameDevToolbox.Geometry2d
         /// </summary>
         private Face FaceContainingOutsideFace(OutsideFace outsideFace)
         {
-            return _paths.Search(Position(outsideFace.HalfEdge.Origin))
+            return _paths.Search(PlanarGraph.Position(outsideFace.HalfEdge.Origin))
                 .OfType<Face>()
                 .Where(face => IsPathsInsideAnother(outsideFace, face))
                 .OrderBy(face => face.Envelope.Area)
@@ -571,7 +593,7 @@ namespace RikusGameDevToolbox.Geometry2d
         private bool IsFaceAtLeastPartiallyInRectangle(Path face, Rect rect)
         {
             return PathHalfEdges(face.HalfEdge)
-                .Any(edge => Intersection.LineSegmentRectangle(Position(edge.Origin), Position(edge.Target), rect));
+                .Any(edge => Intersection.LineSegmentRectangle(PlanarGraph.Position(edge.Origin), PlanarGraph.Position(edge.Target), rect));
         }
         
         private bool IsPathsInsideAnother(Path path, Path anotherPath)
@@ -603,5 +625,6 @@ namespace RikusGameDevToolbox.Geometry2d
         }
         
         #endregion
+
     }
 }

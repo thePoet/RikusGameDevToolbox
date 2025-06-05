@@ -56,13 +56,13 @@ namespace RikusGameDevToolbox.Tests
             Assert.IsFalse(faces.Contains(FaceId.Empty));
             
             // start deleting edges
-            pd.DeleteVertex(pd.VertexAt(new(10f,0f)));
+            pd.DeleteVertex(new(10f,0f));
             Assert.IsTrue(pd.NumFaces==3);
             Assert.IsTrue(pd.NumVertices==6);
             Assert.IsTrue(pd.NumEdges==8);
             
             
-            pd.DeleteVertex(pd.VertexAt(new(0f,5f)));
+            pd.DeleteVertex(new(0f,5f));
             Assert.IsTrue(pd.NumFaces==1);
             Assert.IsTrue(pd.NumVertices==5);
             Assert.IsTrue(pd.NumEdges==5);
