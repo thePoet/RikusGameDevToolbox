@@ -2,7 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using RikusGameDevToolbox.GeneralUse;
-using RikusGameDevToolbox.RTree;
+using RBush;
 using UnityEngine;
 
 namespace RikusGameDevToolbox.Geometry2d
@@ -42,7 +42,7 @@ namespace RikusGameDevToolbox.Geometry2d
         
         private readonly Dictionary<VertexId, HalfEdge> _incidentEdge = new(); // Random half edge starting from the vertex
         private readonly Dictionary<FaceId, Face> _faces = new();
-        private readonly RTree<Path> _paths = new();
+        private readonly RBush<Path> _paths = new();
        // private readonly HashSet<HalfEdge> _halfEdges = new(); // Tarvitaanko?
        
         #region ----------------------------------------- PUBLIC PROPERTIES --------------------------------------------
@@ -56,8 +56,12 @@ namespace RikusGameDevToolbox.Geometry2d
         public int NumFaces => _faces.Values.Count;
         public int NumEdges => PlanarGraph.Edges.Count;
         public int NumVertices => PlanarGraph.Vertices.Count;
+        public IEnumerable<Vector2> Vertices => PlanarGraph.Vertices.Select(v => PlanarGraph.Position(v));
+        public IEnumerable<(Vector2, Vector2)> Edges => PlanarGraph.Edges
+            .Select(edge => (PlanarGraph.Position(edge.Item1), PlanarGraph.Position(edge.Item2)));
         public void AddLine(Vector2 v1, Vector2 v2) => PlanarGraph.AddLine(v1, v2);
         public void DeleteVerticesWithoutEdges() => PlanarGraph.DeleteVerticesWithoutEdges();
+        
     
 
 
@@ -97,7 +101,19 @@ namespace RikusGameDevToolbox.Geometry2d
             return FaceLeftOfEdge(v1,v2);
         }
 
-        
+        public IEnumerable<FaceId> Neighbours(FaceId faceId)
+        {
+            if (!_faces.TryGetValue(faceId, out var face)) throw new ArgumentException("No face with given id.");
+            if (face.Holes?.Any() == true)
+                throw new NotImplementedException("Holes are not supported yet by Neighbours method.");
+
+            return PathHalfEdges(face.HalfEdge)
+                .Select(he => he.Twin.Path)
+                .OfType<Face>()
+                .Distinct()
+                .Select(f => f.Id);
+        }
+
         public void DeleteDegenerateEdges()
         {
             PlanarGraph.Edges
@@ -115,7 +131,7 @@ namespace RikusGameDevToolbox.Geometry2d
             foreach (var face in _faces.Values)
             {
                 _paths.Delete(face);
-                face.Envelope = new Envelope(RectExtensions.CreateRectToEncapsulate(FaceVertexPositions(face.HalfEdge)));
+                UpdateFaceEnvelope(face);
                 _paths.Insert(face);
             }
         }
@@ -150,7 +166,9 @@ namespace RikusGameDevToolbox.Geometry2d
         {
             
         }
-        
+        #endregion
+        #region ------------------------------------------ PRIVATE METHODS ----------------------------------------------
+
         private void OnAddVertex(VertexId vertexId)
         {
             _incidentEdge[vertexId] = null;
@@ -184,8 +202,6 @@ namespace RikusGameDevToolbox.Geometry2d
             DeleteHalfEdgeTwins(halfEdge);
         }
 
-        #endregion
-        #region ------------------------------------------ PRIVATE METHODS ----------------------------------------------
 
 
         private (HalfEdge v1Tov2, HalfEdge v2Tov1) AddHalfEdgePairBetweenVertices(VertexId v1, VertexId v2)
@@ -248,6 +264,7 @@ namespace RikusGameDevToolbox.Geometry2d
             {
                 edge.Path = edge.Next.Path;
                 edge.Twin.Path = edge.Next.Path;
+                UpdatePath(edge.Path);
                 return;
             }
             
@@ -255,6 +272,7 @@ namespace RikusGameDevToolbox.Geometry2d
             {
                 edge.Path = edge.Previous.Path;
                 edge.Twin.Path = edge.Previous.Path;
+                UpdatePath(edge.Path);
                 return;
             }
         
@@ -438,7 +456,7 @@ namespace RikusGameDevToolbox.Geometry2d
                     outsideFace.ContainingFace.Holes.Add(outsideFace);
                 }
                 
-                Debug.Log("Created outside face with containing face: " + outsideFace.ContainingFace?.Id);
+             //   Debug.Log("Created outside face with containing face: " + outsideFace.ContainingFace?.Id);
                 return outsideFace;
             }
             
@@ -447,10 +465,37 @@ namespace RikusGameDevToolbox.Geometry2d
             bool HasArea(HalfEdge start) => PathHalfEdges(start).Any(e => !PathHalfEdges(start).Contains(e.Twin));
         }
 
+        private void UpdatePath(Path path)
+        {
+            if (!_paths.Delete(path))
+            {
+               // foreach (var p in FaceVertexPositions(path.HalfEdge)) Debug.Log(p);
+                
+               foreach (var p in _paths.All())
+               {
+                   if (p==path) Debug.Log("Found path with envelope: " + p.Envelope);
+      
+               }
+               
+               Debug.Log("Current envelope:" + path.Envelope);
+             
+        
+                throw new InvalidOperationException("Deleting path from spatial collection failed.");
+            }
+            UpdateFaceEnvelope(path);
+            _paths.Insert(path);
+        }
         
         private void DeletePath(Path path)
         {
-            if (!_paths.Delete(path)) throw new InvalidOperationException("Could not delete path from spatial collection.");
+            if (!_paths.Delete(path))
+            {
+                foreach (var p in _paths.All())
+                {
+                    if (p==path) throw new InvalidOperationException("Could not find path to be deleted from spatial collection.");
+                }
+                throw new InvalidOperationException("Tried to delete path that does not exist in spatial collection.");
+            }
             
             if (path is Face face)
             {
@@ -583,7 +628,8 @@ namespace RikusGameDevToolbox.Geometry2d
         /// </summary>
         private Face FaceContainingOutsideFace(OutsideFace outsideFace)
         {
-            return _paths.Search(PlanarGraph.Position(outsideFace.HalfEdge.Origin))
+            Vector2 point = PlanarGraph.Position(outsideFace.HalfEdge.Origin);
+            return _paths.Search(point)
                 .OfType<Face>()
                 .Where(face => IsPathsInsideAnother(outsideFace, face))
                 .OrderBy(face => face.Envelope.Area)
@@ -621,9 +667,15 @@ namespace RikusGameDevToolbox.Geometry2d
         
         private void UpdateFaceEnvelope(Path face)
         {
-            face.Envelope = new Envelope( RectExtensions.CreateRectToEncapsulate(FaceVertexPositions(face.HalfEdge)) );
+            Rect rect = RectExtensions.CreateRectToEncapsulate(FaceVertexPositions(face.HalfEdge));
+            face.Envelope = new Envelope(MinX:rect.xMin, 
+                                         MinY:rect.yMin, 
+                                         MaxX:rect.xMax, 
+                                         MaxY:rect.yMax);
         }
-        
+
+       
+
         #endregion
 
     }

@@ -2,7 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using RikusGameDevToolbox.GeneralUse;
-using RikusGameDevToolbox.RTree;
+using RBush;
 using UnityEngine;
 
 namespace RikusGameDevToolbox.Geometry2d
@@ -50,7 +50,8 @@ namespace RikusGameDevToolbox.Geometry2d
             
             public void UpdateEnvelope()
             {
-                Envelope = new Envelope(RectExtensions.CreateRectToEncapsulate(VertexA.Position, VertexB.Position));
+                Rect rect = RectExtensions.CreateRectToEncapsulate(VertexA.Position, VertexB.Position);
+                Envelope = new Envelope(rect.xMin, rect.yMin, rect.xMax, rect.yMax);
             }
         }
 
@@ -59,7 +60,7 @@ namespace RikusGameDevToolbox.Geometry2d
         private readonly float _epsilon;
         private readonly SpatialCollection2d<Vertex> _vertices = new();
         private readonly Dictionary<VertexId, Vertex> _verticesById = new();
-        private readonly RTree<Edge> _edges = new();
+        private readonly RBush<Edge> _edges = new();
 
         #region ----------------------------------- PUBLIC METHODS & PROPERTIES ----------------------------------------
 
@@ -348,7 +349,7 @@ namespace RikusGameDevToolbox.Geometry2d
         /// </summary>
         private IEnumerable<Edge> EdgesIntersecting(Rect rectangle)
         {
-            Envelope searchArea = new Envelope(rectangle);
+            Envelope searchArea = new Envelope(rectangle.xMin, rectangle.yMin, rectangle.xMax, rectangle.yMax);
             return _edges.Search(searchArea).Where( edge => IsEdgeIntersectingRect(edge, rectangle));
             
             bool IsEdgeIntersectingRect(Edge edge, Rect rect)

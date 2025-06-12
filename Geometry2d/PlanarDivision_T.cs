@@ -1,5 +1,4 @@
 #nullable enable
-using System;
 using System.Collections.Generic;
 using System.Linq;
 using UnityEngine;
@@ -7,13 +6,15 @@ using UnityEngine;
 
 namespace RikusGameDevToolbox.Geometry2d
 {
-    public class PlanarDivision<T> : PlanarDivision where T : IEquatable<T>
+    public class PlanarDivision<T> : PlanarDivision 
     {
         private readonly Dictionary<FaceId, T> _faceValues = new();
 
 
         #region ------------------------------------------ PUBLIC METHODS -----------------------------------------------
 
+        public PlanarDivision(float epsilon = 0.00001f) : base(epsilon) { }
+        
         public bool TryGetValue(FaceId faceId, out T value)
         {
             return _faceValues.TryGetValue(faceId, out value);
@@ -83,7 +84,6 @@ namespace RikusGameDevToolbox.Geometry2d
             // Set the value:
 
             FaceId faceId = FaceLeftOfEdge(verticesOnFirstEdge[0], verticesOnFirstEdge[1]);
-            Debug.Log("POL FACE: " + faceId);
             
             SetValue(faceId, value);
 
@@ -116,9 +116,7 @@ namespace RikusGameDevToolbox.Geometry2d
             _faceValues.Remove(oldFaceId1);
             _faceValues.Remove(oldFaceId2);
 
-            bool FacesHaveSameValue(FaceId f1, FaceId f2) => _faceValues.TryGetValue(f1, out var value1) &&
-                                                             _faceValues.TryGetValue(f2, out var value2) &&
-                                                             value1.Equals(value2);
+          
         }
         
         protected override void OnFaceDestroyed(FaceId faceId)
@@ -126,7 +124,14 @@ namespace RikusGameDevToolbox.Geometry2d
             base.OnFaceDestroyed(faceId);
             _faceValues.Remove(faceId);
         }
-        
+
+        private bool FacesHaveSameValue(FaceId f1, FaceId f2)
+        {
+            return _faceValues.TryGetValue(f1, out var value1) &&
+                   _faceValues.TryGetValue(f2, out var value2) &&
+                   EqualityComparer<T>.Default.Equals(value1, value2);
+        }
+
         #endregion
 
     }
