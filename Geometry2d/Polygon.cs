@@ -66,14 +66,11 @@ namespace RikusGameDevToolbox.Geometry2d
             return CreateRectToEncapsulate(Contour);
         }
         
-        public IEnumerable<Edge> ContourEdges()
-        {
-            foreach ((int a, int b) in PointIndicesForEdges())
-            {
-                yield return new Edge(ToVector2(PathsD[0][a]), ToVector2(PathsD[0][b]));
-            }
-        }
+
         
+        /// <summary>
+        /// Returns edges of the polygon contour and its holes.
+        /// </summary>
         public IEnumerable<(Vector2, Vector2)> Edges()
         {
             for (int i = 0; i < PathsD.Count; i++)
@@ -82,6 +79,17 @@ namespace RikusGameDevToolbox.Geometry2d
                 {
                     yield return new (ToVector2(PathsD[i][a]), ToVector2(PathsD[i][b]));
                 }
+            }
+        }
+
+        /// <summary>
+        /// Returns edges of on the given path. Path 0 is the contour of the polygon.
+        /// </summary>
+        public IEnumerable<(Vector2, Vector2)> Edges(int pathIndex)
+        {
+            foreach ((int a, int b) in PointIndicesForEdges(pathIndex))
+            {
+                yield return new(ToVector2(PathsD[pathIndex][a]), ToVector2(PathsD[pathIndex][b]));
             }
         }
 
@@ -96,7 +104,7 @@ namespace RikusGameDevToolbox.Geometry2d
         /// </summary>
         public float Circumference()
         {
-            return ContourEdges().Sum(edge => edge.Length);
+            return Edges(0).Sum(edge => Vector2.Distance(edge.Item1, edge.Item2));
         }
         
         

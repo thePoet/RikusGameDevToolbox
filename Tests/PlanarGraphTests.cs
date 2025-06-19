@@ -57,21 +57,41 @@ namespace RikusGameDevToolbox.Tests
         [Test]
         public void SplitTwoEdges()
         {
+            //       B   D
             //       |   |
-            //     --+---+---
+            //    E--G---H---F
             //       |   |
+            //       A   C
+            Vector2 a = new(2f, 0f);
+            Vector2 b = new(2f, 2f);
+            Vector2 c = new(3f, 0f);
+            Vector2 d = new(3f, 2f);
+            Vector2 e = new(0f, 1f);
+            Vector2 f = new(5f, 1f);
+            Vector2 g = new(2f, 1f);
+            Vector2 h = new(3f, 1f);
+            
             var pg = new PlanarGraph(Epsilon);
-            pg.AddLine(new (2f,0f), new (2f,2f));
-            pg.AddLine(new (3f,0f), new (3f,2f));
-            var result = pg.AddLine(new (0f,1f), new (5f,1f));
+            pg.AddLine(a,b);
+            pg.AddLine(c,d);
+            var result = pg.AddLine(e,f);
             
             Assert.IsTrue( pg.NumVertices == 8 );
             Assert.IsTrue( pg.NumEdges == 7 );
             
-            Assert.IsTrue( IsSame( pg.Position(result[0]), new Vector2(0f,1f) ));
-            Assert.IsTrue( IsSame( pg.Position(result[1]), new Vector2(2f,1f) ));
-            Assert.IsTrue( IsSame( pg.Position(result[2]), new Vector2(3f,1f) ));
-            Assert.IsTrue( IsSame( pg.Position(result[3]), new Vector2(5f,1f) ));
+            Assert.IsTrue( IsSame( pg.Position(result[0]), e ));
+            Assert.IsTrue( IsSame( pg.Position(result[1]), g ));
+            Assert.IsTrue( IsSame( pg.Position(result[2]), h ));
+            Assert.IsTrue( IsSame( pg.Position(result[3]), f ));
+            
+            Assert.IsTrue( pg.IsEdgeBetween(pg.VertexAt(e), pg.VertexAt(g)) );
+            Assert.IsTrue( pg.IsEdgeBetween(pg.VertexAt(g), pg.VertexAt(h)) );
+            Assert.IsTrue( pg.IsEdgeBetween(pg.VertexAt(h), pg.VertexAt(f)) );
+            Assert.IsTrue( pg.IsEdgeBetween(pg.VertexAt(a), pg.VertexAt(g)) );
+            Assert.IsTrue( pg.IsEdgeBetween(pg.VertexAt(g), pg.VertexAt(b)) );
+            Assert.IsTrue( pg.IsEdgeBetween(pg.VertexAt(c), pg.VertexAt(h)) );
+            Assert.IsTrue( pg.IsEdgeBetween(pg.VertexAt(h), pg.VertexAt(d)) );
+
         }
 
         [Test]

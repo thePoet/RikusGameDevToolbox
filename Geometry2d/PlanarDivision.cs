@@ -43,14 +43,14 @@ namespace RikusGameDevToolbox.Geometry2d
         private readonly Dictionary<VertexId, HalfEdge> _incidentEdge = new(); // Random half edge starting from the vertex
         private readonly Dictionary<FaceId, Face> _faces = new();
         private readonly RBush<Path> _paths = new();
-       // private readonly HashSet<HalfEdge> _halfEdges = new(); // Tarvitaanko?
+    
        
         #region ----------------------------------------- PUBLIC PROPERTIES --------------------------------------------
        
         public IEnumerable<FaceId> AllFaces() => _faces.Keys;
         public FaceId FaceAt(Vector2 position) => NormalFaceAt(position)?.Id ?? FaceId.Empty;
         public bool HasFace(FaceId faceId) => _faces.ContainsKey(faceId);
-        public IEnumerable<FaceId> FacesIn(Rect rect) => NormalFacesIn(rect).Select(face => face.Id);
+        public IEnumerable<FaceId> FacesIn(Rect rect) => NormalFacesIn(rect).Select(face => face.Id); 
         public SimplePolygon FaceContour(FaceId faceId) => new SimplePolygon(FaceVertexPositions(_faces[faceId].HalfEdge));
         public Polygon FacePolygon(FaceId faceId) => FaceAsPolygon(_faces[faceId]);
         public int NumFaces => _faces.Values.Count;
@@ -103,7 +103,7 @@ namespace RikusGameDevToolbox.Geometry2d
 
         public IEnumerable<FaceId> Neighbours(FaceId faceId)
         {
-            if (!_faces.TryGetValue(faceId, out var face)) throw new ArgumentException("No face with given id.");
+            var face = FaceOrThrow(faceId);
             if (face.Holes?.Any() == true)
                 throw new NotImplementedException("Holes are not supported yet by Neighbours method.");
 
@@ -112,6 +112,29 @@ namespace RikusGameDevToolbox.Geometry2d
                 .OfType<Face>()
                 .Distinct()
                 .Select(f => f.Id);
+        }
+
+        public FaceId Merge(FaceId faceId1, FaceId faceId2)
+        {
+            Debug.Log("On se jännä");
+            var (face1, face2) = (FaceOrThrow(faceId1), FaceOrThrow(faceId2));
+
+
+            List<HalfEdge> sharedEdges = PathHalfEdges(face1.HalfEdge)
+                .Where(he => he.Twin.Path is Face face && face.Id == faceId2)
+                .ToList();
+            Debug.Log(sharedEdges.Count + " shared edges found between faces " + faceId1 + " and " + faceId2);
+
+            HalfEdge nonSharedEdge = PathHalfEdges(face1.HalfEdge)
+                                         .FirstOrDefault(he => he.Twin.Path is Face face && face.Id != faceId2)
+                                     ?? PathHalfEdges(face2.HalfEdge)
+                                         .FirstOrDefault(he => he.Twin.Path is Face face && face.Id != faceId1);
+
+            sharedEdges.ForEach(se => PlanarGraph.DeleteEdge(se.Origin, se.Target));
+
+            FaceId newFaceId = FaceLeftOfEdge(nonSharedEdge.Origin, nonSharedEdge.Target);
+            OnFacesMerged(faceId1, faceId2, newFaceId);
+            return newFaceId;
         }
 
         public void DeleteDegenerateEdges()
@@ -674,7 +697,10 @@ namespace RikusGameDevToolbox.Geometry2d
                                          MaxY:rect.yMax);
         }
 
-       
+        private Face FaceOrThrow(FaceId faceId)
+        {
+            return _faces.TryGetValue(faceId, out var face) ? face : throw new ArgumentException("No face with given id.");
+        }
 
         #endregion
 

@@ -25,7 +25,23 @@ namespace RikusGameDevToolbox.Geometry2d
             return length;
         }
 
+        /// <summary>
+        /// Returns the pairs of vertex positions on a path. The last pair is the last and the first vertex.
+        /// </summary>
+        public static IEnumerable<(Vector2, Vector2)> VertexPairs(IReadOnlyCollection<Vector2> path)
+        {
+            for (int i = 0; i < path.Count; i++)
+            {
+                yield return i == path.Count - 1
+                    ? (path.ElementAt(i), path.ElementAt(0))
+                    : (path.ElementAt(i), path.ElementAt(i + 1));
+            }
+        }
        
+        public static string AsString(Vector2[] path)
+        {
+            return string.Join(" -> ", path.Select(p => $"({p.x}, {p.y})"));
+        }
 
         public static bool IsCounterClockwise(Vector2[] path) => IsCounterClockwise(ToPathD(path));
         public static bool IsClockWise(Vector2[] path) => IsClockwise(ToPathD(path));

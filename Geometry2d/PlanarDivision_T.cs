@@ -1,8 +1,9 @@
 #nullable enable
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using UnityEngine;
-
+using static RikusGameDevToolbox.Geometry2d.Util;
 
 namespace RikusGameDevToolbox.Geometry2d
 {
@@ -58,34 +59,57 @@ namespace RikusGameDevToolbox.Geometry2d
         /// </summary>
         public void AddPolygonOver(Polygon polygon, T value)
         {
-            // Draw the edges of the polygon and store the vertices on them:
-            HashSet<VertexId> verticesOnEdges = new();
-
-            List<VertexId> verticesOnFirstEdge = new();
-            
-            foreach ((Vector2 p1, Vector2 p2) in polygon.Edges())
+            // Draw the edges of the polygon:
+            HashSet<VertexId> verticesOnEdges = new(); // Store all vertices that are on the edges of the polygon (inc. holes).
+            List<VertexId> verticesOnContour = new(); // Store all vertices that are on the contour of the polygon (the first path).
+            for (int pathIndex = 0; pathIndex < polygon.NumHoles + 1; pathIndex++)
             {
-                var verticesOnEdge = PlanarGraph.AddLine(p1, p2);
-                verticesOnEdges.UnionWith(verticesOnEdge);
-                if (verticesOnFirstEdge.Count == 0)
+                foreach ((Vector2 p1, Vector2 p2) in polygon.Edges(pathIndex))
                 {
-                    verticesOnFirstEdge = verticesOnEdge;
+                    var verticesOnEdge = PlanarGraph.AddLine(p1, p2);
+                    verticesOnEdges.UnionWith(verticesOnEdge);
+                    if (pathIndex == 0)
+                    {
+                        verticesOnContour.AddRange(verticesOnEdge.Take(verticesOnEdge.Count - 1));
+                    }
                 }
             }
             
-
             // Vertices that are inside the polygon, not on the edges will be deleted:
             PlanarGraph.VerticesIn(polygon.Bounds())
                 .Where(v => polygon.IsPointInside(PlanarGraph.Position(v)) && !verticesOnEdges.Contains(v))
                 .ToList()
                 .ForEach(PlanarGraph.DeleteVertex);
-
-      
-            // Set the value:
-
-            FaceId faceId = FaceLeftOfEdge(verticesOnFirstEdge[0], verticesOnFirstEdge[1]);
             
-            SetValue(faceId, value);
+
+            HashSet<FaceId> facesOnPolygon = new();
+            LoopingPairs(verticesOnContour).ToList()
+                .ForEach(pair=> facesOnPolygon.Add( FaceLeftOfEdge(pair.Item1, pair.Item2) ));
+            
+        
+
+            for (int i = 0; i < 10000; i++)
+            {
+                if (facesOnPolygon.Count == 1)
+                {
+                    SetValue(facesOnPolygon.First(), value);
+                    return;
+                }
+                
+                Debug.Log("jännän äärellä");
+                
+                FaceId face = facesOnPolygon.First();
+                facesOnPolygon.Remove(face);
+
+                FaceId neighbour = facesOnPolygon.FirstOrDefault(f => Neighbours(f).Contains(face))
+                                   ?? throw new InvalidOperationException("Disconnected face detected while trying to add polygon over.");
+                facesOnPolygon.Remove(neighbour);
+
+                facesOnPolygon.Add( Merge(face, neighbour) );
+            }
+                
+            throw new InvalidOperationException("Infite loop detected while trying to add polygon over.");
+            
 
         }
 
@@ -115,8 +139,6 @@ namespace RikusGameDevToolbox.Geometry2d
             }
             _faceValues.Remove(oldFaceId1);
             _faceValues.Remove(oldFaceId2);
-
-          
         }
         
         protected override void OnFaceDestroyed(FaceId faceId)

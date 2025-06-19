@@ -4,6 +4,7 @@ using System.Linq;
 using RikusGameDevToolbox.GeneralUse;
 using RBush;
 using UnityEngine;
+using static RikusGameDevToolbox.Geometry2d.Util;
 
 namespace RikusGameDevToolbox.Geometry2d
 {
@@ -101,14 +102,11 @@ namespace RikusGameDevToolbox.Geometry2d
           
             List<Vertex> verticesOnLine = VerticesOnLine(va, vb); // Find vertices that already exist on the line
 
-            for (int i = 0; i < verticesOnLine.Count-1; i++)
+            foreach (var (v1, v2) in Pairs(verticesOnLine) )
             {
-                Vertex v1 = verticesOnLine[i];
-                Vertex v2 = verticesOnLine[i+1];
-                
                 if (v1==v2) throw new InvalidOperationException("Something went wrong when adding a line.");
                 
-                result.Add( verticesOnLine[i].Id );
+                result.Add( v1.Id );
 
                 if (!IsEdgeBetween(v1.Id, v2.Id))
                 {
@@ -119,7 +117,6 @@ namespace RikusGameDevToolbox.Geometry2d
             }
             result.Add(verticesOnLine.Last().Id);
             
-    
             return result;
 
 
@@ -135,7 +132,7 @@ namespace RikusGameDevToolbox.Geometry2d
                 {
                     Vertex intersectionVertex = InsertVertexOnEdge(intersection.edge, intersection.intersectionPosition);
                    
-                    AddEdge(vertexA, intersectionVertex);
+                    AddEdge(currentVertex, intersectionVertex);
                     currentVertex = intersectionVertex;
                     intersectionVertices.Add(intersectionVertex.Id);
                 }
@@ -144,8 +141,6 @@ namespace RikusGameDevToolbox.Geometry2d
             }
          
         }
-
-
 
 
         public void DeleteEdge(VertexId a, VertexId b)
