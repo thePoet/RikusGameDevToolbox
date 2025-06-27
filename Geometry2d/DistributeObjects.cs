@@ -57,6 +57,14 @@ namespace RikusGameDevToolbox.Geometry2d
            // var result =  InRectangle(polygon.Bounds(), minSpacing,existingPoints).Where(polygon.IsPointInside).ToList();
             return result;
         }
+        
+        public static List<Vector2> InPolygonCrude(Polygon polygon, float minSpacing)
+        {
+            List<Vector2> candidatePoints = InRectangle(polygon.Bounds(), minSpacing);
+            candidatePoints.RemoveAll(point => !polygon.IsPointInside(point));
+            return candidatePoints;
+        }
+
 
 
         // Poisson disk sampling algorithm based on: http://devmag.org.za/2009/05/03/poisson-disk-sampling/

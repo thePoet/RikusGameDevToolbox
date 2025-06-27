@@ -5,10 +5,16 @@ using RikusGameDevToolbox.GeneralUse;
 using RBush;
 using UnityEngine;
 
+
 namespace RikusGameDevToolbox.Geometry2d
 {
-    public class PlanarDivision 
+    public class PlanarDivision
     {
+        public static float t1;
+        public static float t2;
+        public static float t3;
+        
+        
         private abstract class Path : ISpatialData
         {
             public HalfEdge HalfEdge; // Random half edge on the path
@@ -20,7 +26,7 @@ namespace RikusGameDevToolbox.Geometry2d
             public FaceId Id;
             public List<OutsideFace> Holes;
         }
-
+        
         private class OutsideFace : Path
         {
             public Face ContainingFace;
@@ -59,11 +65,11 @@ namespace RikusGameDevToolbox.Geometry2d
         public IEnumerable<Vector2> Vertices => PlanarGraph.Vertices.Select(v => PlanarGraph.Position(v));
         public IEnumerable<(Vector2, Vector2)> Edges => PlanarGraph.Edges
             .Select(edge => (PlanarGraph.Position(edge.Item1), PlanarGraph.Position(edge.Item2)));
-        public void AddLine(Vector2 v1, Vector2 v2) => PlanarGraph.AddLine(v1, v2);
+        public List<Vector2> AddLine(Vector2 v1, Vector2 v2) => PlanarGraph.AddLine(v1, v2).Select(id => PlanarGraph.Position(id)).ToList();
+        public void DeleteEdge(Vector2 v1, Vector2 v2) => PlanarGraph.DeleteEdge(v1, v2);
         public void DeleteVerticesWithoutEdges() => PlanarGraph.DeleteVerticesWithoutEdges();
         
     
-
 
         #endregion
         #region ------------------------------------------ PUBLIC METHODS -----------------------------------------------
@@ -116,14 +122,11 @@ namespace RikusGameDevToolbox.Geometry2d
 
         public FaceId Merge(FaceId faceId1, FaceId faceId2)
         {
-            Debug.Log("On se jännä");
             var (face1, face2) = (FaceOrThrow(faceId1), FaceOrThrow(faceId2));
-
-
+            
             List<HalfEdge> sharedEdges = PathHalfEdges(face1.HalfEdge)
                 .Where(he => he.Twin.Path is Face face && face.Id == faceId2)
                 .ToList();
-            Debug.Log(sharedEdges.Count + " shared edges found between faces " + faceId1 + " and " + faceId2);
 
             HalfEdge nonSharedEdge = PathHalfEdges(face1.HalfEdge)
                                          .FirstOrDefault(he => he.Twin.Path is Face face && face.Id != faceId2)
@@ -166,7 +169,7 @@ namespace RikusGameDevToolbox.Geometry2d
             PlanarGraph.DeleteVertex(id);
             return true;
         }
-            
+                
         #endregion
         #region ---------------------------------------- PROTECTED METHODS ---------------------------------------------
 
@@ -199,8 +202,11 @@ namespace RikusGameDevToolbox.Geometry2d
         
         private void OnAddEdge(VertexId v1, VertexId v2)
         {
+            if (v1==v2) Debug.LogWarning("Tried to add edge with same vertices: " + v1 + " and " + v2);
+            float t = Time.realtimeSinceStartup;
             var (halfEdge1, halfEdge2) = AddHalfEdgePairBetweenVertices(v1, v2);
             UpdateFacesAfterAddingHalfEdgePair(halfEdge1);
+            t1 += Time.realtimeSinceStartup - t;
         }
         
         private void OnSplitEdge(VertexId v1, VertexId v2, VertexId newVertex)
@@ -438,6 +444,7 @@ namespace RikusGameDevToolbox.Geometry2d
 
         private Path CreateAndSetNewPathFrom(HalfEdge startEdge)
         {
+           
             Path path = HasArea(startEdge) && IsCcw(startEdge)
                 ? CreateFace(startEdge)
                 : CreateOutsideFace(startEdge);
@@ -447,7 +454,6 @@ namespace RikusGameDevToolbox.Geometry2d
             {
                 edge.Path = path;
             }
-
             _paths.Insert(path);
             if (path is Face face) _faces.Add(face.Id, face);
 
@@ -461,8 +467,14 @@ namespace RikusGameDevToolbox.Geometry2d
                     HalfEdge = start
                 };
                 UpdateFaceEnvelope(newFace);
-                newFace.Holes = HolesInsideFace(newFace);
+
+                float t = Time.realtimeSinceStartup; 
+                newFace.Holes = HolesInsideFace(newFace); // SLOW !!!!!!!!!!
+                t2 += (Time.realtimeSinceStartup-t);
+
+                
                 newFace.Holes?.ForEach(hole => hole.ContainingFace = newFace);
+
                 return newFace;
             }
 
@@ -471,13 +483,18 @@ namespace RikusGameDevToolbox.Geometry2d
                 OutsideFace outsideFace = new OutsideFace();
                 outsideFace.HalfEdge = start;
                 UpdateFaceEnvelope(outsideFace);
-                outsideFace.ContainingFace = FaceContainingOutsideFace(outsideFace);
+                
+                float t = Time.realtimeSinceStartup;
+                outsideFace.ContainingFace = FaceContainingOutsideFace(outsideFace);  // SLOW !!!!!!!!!!
+                t3 += (Time.realtimeSinceStartup-t);
+                
                 if (outsideFace.ContainingFace != null)
                 {
                     if (outsideFace.ContainingFace.Holes == null)
                         outsideFace.ContainingFace.Holes = new List<OutsideFace>();
                     outsideFace.ContainingFace.Holes.Add(outsideFace);
                 }
+
                 
              //   Debug.Log("Created outside face with containing face: " + outsideFace.ContainingFace?.Id);
                 return outsideFace;

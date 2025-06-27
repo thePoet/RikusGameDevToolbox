@@ -96,8 +96,10 @@ namespace RikusGameDevToolbox.Geometry2d
         {
             Vertex va = GetOrAddVertex(a);
             Vertex vb = GetOrAddVertex(b);
+
+            if (va == vb) return new List<VertexId>{va.Id};
+
             var result = new List<VertexId>();
-            
             var nearbyEdges = EdgesIntersecting(RectAroundEdge(va,vb)).ToList();
           
             List<Vertex> verticesOnLine = VerticesOnLine(va, vb); // Find vertices that already exist on the line
@@ -154,6 +156,11 @@ namespace RikusGameDevToolbox.Geometry2d
             if (edge==null) throw new ArgumentException("Edge not found");
 
             DeleteEdge(edge);
+        }
+        
+        public void DeleteEdge(Vector2 a, Vector2 b)
+        {
+            DeleteEdge( VertexAt(a), VertexAt(b) );
         }
 
         /// <summary>

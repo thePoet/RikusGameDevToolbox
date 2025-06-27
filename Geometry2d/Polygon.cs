@@ -60,6 +60,11 @@ namespace RikusGameDevToolbox.Geometry2d
         /// Is the point on the edge of the polygon or it's holes?
         /// </summary>
         public bool IsPointOnEdge(Vector2 point) => PointInPolygon(point) is PointInPolygonResult.IsOn;
+        
+        /// <summary>
+        /// Is the point inside the polygon or on it's edges (but not inside it's holes)?
+        /// </summary>
+        public bool IsPointOn(Vector2 point) => IsPointInside(point) || IsPointOnEdge(point);
  
         public Rect Bounds()
         {

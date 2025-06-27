@@ -24,14 +24,11 @@ namespace RikusGameDevToolbox.Geometry2d
         public bool TryGetValue(Vector2 position, out T value)
         {
             FaceId faceId = FaceAt(position);
-            Debug.Log("face at pos: " + faceId);
-            Debug.Log("empty: " + (faceId == FaceId.Empty));
             if (faceId == FaceId.Empty)
             {
                 value = default!;
                 return false;
             }
-            
   
             return _faceValues.TryGetValue(faceId, out value);
         }
@@ -95,8 +92,6 @@ namespace RikusGameDevToolbox.Geometry2d
                     SetValue(facesOnPolygon.First(), value);
                     return;
                 }
-                
-                Debug.Log("jännän äärellä");
                 
                 FaceId face = facesOnPolygon.First();
                 facesOnPolygon.Remove(face);
