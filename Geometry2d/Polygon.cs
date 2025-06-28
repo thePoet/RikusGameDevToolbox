@@ -56,16 +56,24 @@ namespace RikusGameDevToolbox.Geometry2d
         /// </summary>
         public bool IsPointInside(Vector2 point) => PointInPolygon(point) is PointInPolygonResult.IsInside;
         
-        /// <summary>
-        /// Is the point on the edge of the polygon or it's holes?
-        /// </summary>
-        public bool IsPointOnEdge(Vector2 point) => PointInPolygon(point) is PointInPolygonResult.IsOn;
+        
+        
         
         /// <summary>
-        /// Is the point inside the polygon or on it's edges (but not inside it's holes)?
+        /// Is the point on the edge of the polygon including edges of it's holes?
         /// </summary>
-        public bool IsPointOn(Vector2 point) => IsPointInside(point) || IsPointOnEdge(point);
- 
+        /// <param name="point"></param>
+        /// <param name="precision">Max allowed distance from edge</param>
+        public bool IsPointOnEdge(Vector2 point, float precision = 0.0001f)
+        {
+            foreach ( (Vector2 edgeStart, Vector2 edgeEnd) in Edges())
+            {
+                if (GeometryUtils.IsPointOnEdge(point, edgeStart, edgeEnd, precision)) return true;
+            }
+            return false;
+        }
+
+
         public Rect Bounds()
         {
             return CreateRectToEncapsulate(Contour);
@@ -176,12 +184,17 @@ namespace RikusGameDevToolbox.Geometry2d
         
         
         #region ------------------------------------------ PRIVATE METHODS ----------------------------------------------
+        /// <summary>
+        /// Tests if the point is inside the polygon or on its edges.
+        /// TODO: This does not usually detect correctly if point is on the edges.
+        /// </summary>
         private PointInPolygonResult PointInPolygon(Vector2 point)
         {
             var p = ToPointD(point);
-            var r = Clipper.PointInPolygon(ToPointD(point), PathsD[0]);
-            if (r!=PointInPolygonResult.IsInside) return r;
+            var result = Clipper.PointInPolygon(ToPointD(point), PathsD[0], precision: 2);
             
+            if (result!=PointInPolygonResult.IsInside) return result;
+
             // Holes:
             for (int i=1; i<PathsD.Count; i++)
             {
@@ -189,7 +202,7 @@ namespace RikusGameDevToolbox.Geometry2d
                 if (Clipper.PointInPolygon(p, PathsD[i]) is PointInPolygonResult.IsOn) return PointInPolygonResult.IsOn;
             }
             return PointInPolygonResult.IsInside;
-            
+
         }
         
              

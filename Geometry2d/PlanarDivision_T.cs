@@ -2,6 +2,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using RikusGameDevToolbox.GeneralUse;
 using UnityEngine;
 using static RikusGameDevToolbox.Geometry2d.Util;
 
@@ -31,6 +32,18 @@ namespace RikusGameDevToolbox.Geometry2d
             }
   
             return _faceValues.TryGetValue(faceId, out value);
+        }
+
+        public T Value(FaceId faceId)
+        {
+            if (_faceValues.TryGetValue(faceId, out T value)) return value;
+            return default!;
+        }
+    
+        
+        public bool FaceHasValue(FaceId faceId)
+        {
+            return _faceValues.ContainsKey(faceId);
         }
 
         public void SetValue(FaceId faceId, T data)

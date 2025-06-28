@@ -68,6 +68,8 @@ namespace RikusGameDevToolbox.Geometry2d
         public int NumEdges => _edges.Count;
         public int NumVertices => _verticesById.Count;
         public List<(VertexId v1, VertexId v2)> Edges => _edges.All().Select(e => (e.VertexA.Id, e.VertexB.Id)).ToList();
+        public List<(Vector2 v1, Vector2 v2)> EdgeVertexPositions => _edges.All().Select(e => (e.VertexA.Position, e.VertexB.Position)).ToList();
+
         public List<VertexId> Vertices => _verticesById.Keys.ToList();
 
 
@@ -327,7 +329,7 @@ namespace RikusGameDevToolbox.Geometry2d
             
             oldEdge.VertexA.Edges.Remove(oldEdge);
             oldEdge.VertexB.Edges.Remove(oldEdge);
-            if (!_edges.Delete(oldEdge)) throw new InvalidOperationException("Failed to delete edge from spatial index");
+            if (!_edges.Delete(oldEdge)) throw new InvalidOperationException("Failed to delete edge from spatial index: " + oldEdge);
             
             // First new edge
             Edge edge1 = new Edge(oldEdge.VertexA, newVertex);

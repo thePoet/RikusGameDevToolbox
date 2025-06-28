@@ -25,10 +25,10 @@ namespace RikusGameDevToolbox.Geometry2d
             List<VoronoiEdge> edges = CreateVoronoiEdges(points, polygon.Bounds(), relaxIterations);
             return DivisionFromVoronoiEdges(edges, polygon);
         }
-        public static PlanarGraph CreateInPolygon2(Polygon polygon, IEnumerable<Vector2> points,  int relaxIterations=0)
+        public static PlanarGraph AsPlanarGraph(Polygon polygon, IEnumerable<Vector2> points,  int relaxIterations=0)
         {
             List<VoronoiEdge> edges = CreateVoronoiEdges(points, polygon.Bounds(), relaxIterations);
-            return DivisionFromVoronoiEdges2(edges, polygon);
+            return PlanarGraphFromVoronoiEdges(edges, polygon);
         }
 
         public static PolygonMesh CreatePolygonMesh(IEnumerable<Vector2> points, Rect size, float minEdgeLength)
@@ -74,52 +74,53 @@ namespace RikusGameDevToolbox.Geometry2d
                     foreach (var (v1, v2) in Pairs(edgeVertices))
                     {
                         Vector2 middle = (v1 + v2) / 2f;
-                        if (!cookieCutter.IsPointOn(middle)) division.DeleteEdge(v1, v2);
+                        if (!cookieCutter.IsPointInside(middle)) division.DeleteEdge(v1, v2);
                     }
 
                     // Delete vertices outside the polygon
                     foreach (Vector2 v in edgeVertices)
                     {
-                        if (!cookieCutter.IsPointOn(v)) division.DeleteVertex(v);
+                        if (!cookieCutter.IsPointInside(v) && !cookieCutter.IsPointOnEdge(v))  division.DeleteVertex(v);
                     }
                 }
                 return division;
         }
         
-        private static PlanarGraph DivisionFromVoronoiEdges2(List<VoronoiEdge> voronoiEdges,  Polygon cookieCutter=null)
+        private static PlanarGraph PlanarGraphFromVoronoiEdges(List<VoronoiEdge> voronoiEdges,  Polygon cookieCutter=null)
         {
             // TODO: This should be done without fixed epsilon.
-            PlanarGraph division = new(0.0001f);
+            PlanarGraph graph = new(0.001f);
 
             if (cookieCutter != null)
             {
                 foreach ((Vector2 v1, Vector2 v2) edge in cookieCutter.Edges())
                 {
-                    division.AddLine(edge.v1, edge.v2);
+                    graph.AddLine(edge.v1, edge.v2);
                 }
             }
 
             foreach (var edge in voronoiEdges)
             {
                 (Vector2 start, Vector2 end) = (edge.Start.AsVector2(), edge.End.AsVector2());
-                var edgeVertices = division.AddLine(start, end);
+                var edgeVertices = graph.AddLine(start, end);
 
                 if (cookieCutter == null) continue;
 
                 // Delete edges that go across space outside the polygon 
                 foreach (var (v1, v2) in Pairs(edgeVertices))
                 {
-                    Vector2 middle = (division.Position(v1) + division.Position((v2))) / 2f;
-                    if (!cookieCutter.IsPointOn(middle)) division.DeleteEdge(v1, v2);
+                    Vector2 middle = (graph.Position(v1) + graph.Position((v2))) / 2f;
+                    if (!cookieCutter.IsPointInside(middle)) graph.DeleteEdge(v1, v2);
                 }
 
                 // Delete vertices outside the polygon
                 foreach (var v in edgeVertices)
                 {
-                    if (!cookieCutter.IsPointOn(division.Position(v))) division.DeleteVertex(v);
+                    var vPos = graph.Position(v);
+                    if (!cookieCutter.IsPointInside(vPos) && !cookieCutter.IsPointOnEdge(vPos))  graph.DeleteVertex(v);
                 }
             }
-            return division;
+            return graph;
         }
 
         

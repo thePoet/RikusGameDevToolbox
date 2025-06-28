@@ -47,6 +47,29 @@ namespace RikusGameDevToolbox.Tests
             Assert.IsTrue(holed.IsPointOnEdge(new Vector2(0, 1)));
             Assert.IsTrue(!holed.IsPointInside(new Vector2(-1, -1)));
             Assert.IsTrue(!holed.IsPointInside(new Vector2(5.5f, 5.5f)));
+            
+            int numErrors = 0;
+            for (int i=0; i<1000; i++)
+            {
+                Vector2 p1 = new Vector2(2f,2f) + new Vector2(Random.Range(-0.5f, 0.5f), Random.Range(-0.5f, 0.5f));
+                Vector2 p2 = new Vector2(-2f,2f) + new Vector2(Random.Range(-0.5f, 0.5f), Random.Range(-0.5f, 0.5f));
+                Vector2 p3 = new Vector2(-2f,-2f) + new Vector2(Random.Range(-0.5f, 0.5f), Random.Range(-0.5f, 0.5f));
+
+                Polygon poly = new SimplePolygon(new[] { p1, p2, p3 });
+
+                Vector2 p = (p1 + p2) * 0.5f;
+                
+                
+                bool isInside = poly.IsPointInside(p);
+                bool isOnEdge = poly.IsPointOnEdge(p);
+                if (!isOnEdge)
+                {
+                    Debug.LogError("Point is not on edge: " + p + " of polygon: " + poly);
+                    numErrors++;
+                }
+            
+            }
+            Assert.IsTrue(numErrors == 0, "There were " + numErrors + " / 1000 errors in IsPointOnEdge test.");
         }
 
         [Test]
