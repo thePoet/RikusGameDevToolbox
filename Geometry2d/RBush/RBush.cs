@@ -20,7 +20,7 @@ namespace RBush
 		private readonly IEqualityComparer<T> _comparer;
 		private readonly int _maxEntries;
 		private readonly int _minEntries;
-
+		
 		
 		/// <summary>
 		/// The root of the R-tree.
@@ -126,6 +126,9 @@ namespace RBush
 		/// </param>
 		public void Insert(T item)
 		{
+			if (double.IsNaN(item.Envelope.MinX) || double.IsNaN(item.Envelope.MinY)||
+			    double.IsNaN(item.Envelope.MinX) || double.IsNaN(item.Envelope.MinY))
+			    throw new Exception("NaN in item Envelope");
 			Insert(item, Root.Height);
 			Count++;
 		}
@@ -201,14 +204,16 @@ namespace RBush
 		/// The object to be removed from the <see cref="RBush{T}"/>.
 		/// </param>
 		/// <returns><see langword="bool" /> indicating whether the item was deleted.</returns>
-		public bool Delete(T item) =>
-			DoDelete(Root, item);
+		public bool Delete(T item)
+		{
+			return DoDelete(Root, item);
+		}
 
 		private bool DoDelete(Node node, T item)
 		{
 			if (!node.Envelope.Contains(item.Envelope))
 				return false;
-
+			
 			if (node.IsLeaf)
 			{
 				var cnt = node.Items.RemoveAll(i => _comparer.Equals((T)i, item));

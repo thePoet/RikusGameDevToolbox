@@ -73,7 +73,7 @@ namespace RBush
 			MinY <= other.MinY &&
 			MaxX >= other.MaxX &&
 			MaxY >= other.MaxY;
-
+		
 		/// <summary>
 		/// Determines whether <paramref name="other"/> intersects
 		/// this bounding box.
@@ -109,5 +109,10 @@ namespace RBush
 				MinY: double.PositiveInfinity,
 				MaxX: double.NegativeInfinity,
 				MaxY: double.NegativeInfinity);
+		
+		public override string ToString()
+		{
+			return $"Envelope(MinX: {MinX}, MinY: {MinY}, MaxX: {MaxX}, MaxY: {MaxY})";
+		}
 	}
 }

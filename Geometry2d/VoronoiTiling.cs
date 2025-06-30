@@ -89,7 +89,7 @@ namespace RikusGameDevToolbox.Geometry2d
         private static PlanarGraph PlanarGraphFromVoronoiEdges(List<VoronoiEdge> voronoiEdges,  Polygon cookieCutter=null)
         {
             // TODO: This should be done without fixed epsilon.
-            PlanarGraph graph = new(0.001f);
+            PlanarGraph graph = new(0.015f);
 
             if (cookieCutter != null)
             {
@@ -121,6 +121,7 @@ namespace RikusGameDevToolbox.Geometry2d
                 }
             }
             return graph;
+
         }
 
         

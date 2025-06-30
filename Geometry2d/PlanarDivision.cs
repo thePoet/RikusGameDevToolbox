@@ -8,8 +8,12 @@ using RikusGameDevToolbox.Geometry2d.Internal;
 
 namespace RikusGameDevToolbox.Geometry2d
 {
+    
+    
     public class PlanarDivision
     {
+        public List<Vector2> DebugLine;
+        
         internal class HalfEdge
         {
             public VertexId Origin; // Vertex at the origin of the half edge
@@ -306,7 +310,7 @@ namespace RikusGameDevToolbox.Geometry2d
                 }
                 else
                 {
-                    throw new Exception("Something went wrong when splitting two faces.");
+                    throw new Exception("Something went wrong when splitting a face.");
                 }
             }
             
@@ -322,7 +326,10 @@ namespace RikusGameDevToolbox.Geometry2d
                     OnFaceCreated(face2.Id);
                     return;
                 }
-                throw new Exception("Something went wrong when combining two boundary faces.");
+
+                DebugLine = PathPositions(path1.HalfEdge);
+
+                throw new Exception("Something went wrong when ");
             }
             
             
@@ -559,6 +566,11 @@ namespace RikusGameDevToolbox.Geometry2d
                 if (current == first) yield break;
             } 
             throw new InvalidOperationException("Infinite loop in FaceHalfEdges"); 
+        }
+
+        private List<Vector2> PathPositions(HalfEdge halfEdge)
+        {
+            return PathHalfEdges(halfEdge).Select(he => PlanarGraph.Position(he.Origin)).ToList();
         }
         
         
