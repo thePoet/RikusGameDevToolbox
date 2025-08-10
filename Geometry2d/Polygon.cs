@@ -48,16 +48,15 @@ namespace RikusGameDevToolbox.Geometry2d
         /// </summary>
         public Vector2[][] Paths => PathsD.Select(PathUtils.ToVector2Array).ToArray();
         
-
+        /// <summary>
+        /// Surface area of the polygon.
+        /// </summary>
         public float Area => (float)Clipper.Area(PathsD);
 
         /// <summary>
         /// Is the point inside the polygon but not inside it's holes or on it's edges?
         /// </summary>
         public bool IsPointInside(Vector2 point) => PointInPolygon(point) is PointInPolygonResult.IsInside;
-        
-        
-        
         
         /// <summary>
         /// Is the point on the edge of the polygon including edges of it's holes?
@@ -66,9 +65,9 @@ namespace RikusGameDevToolbox.Geometry2d
         /// <param name="precision">Max allowed distance from edge</param>
         public bool IsPointOnEdge(Vector2 point, float precision = 0.0001f)
         {
-            foreach ( (Vector2 edgeStart, Vector2 edgeEnd) in Edges())
+            foreach (PathD path in PathsD)
             {
-                if (GeometryUtils.IsPointOnEdge(point, edgeStart, edgeEnd, precision)) return true;
+                if (PathUtils.IsPointOn(point, path.Select(ToVector2), precision)) return true;
             }
             return false;
         }

@@ -3,6 +3,8 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using RikusGameDevToolbox.GeneralUse;
+using RikusGameDevToolbox.Geometry2d.Internal;
+
 using UnityEngine;
 using static RikusGameDevToolbox.Geometry2d.Util;
 
@@ -10,6 +12,8 @@ namespace RikusGameDevToolbox.Geometry2d
 {
     public class PlanarDivision<T> : PlanarDivision 
     {
+        public bool ValuelessFacesAreEmpty = true; 
+        
         private readonly Dictionary<FaceId, T> _faceValues = new();
 
 
@@ -60,9 +64,9 @@ namespace RikusGameDevToolbox.Geometry2d
         // Deletes
         public void DeleteFace(FaceId faceId)
         {
-            
+            throw new NotImplementedException();
         }
-
+        
         /// <summary>
         /// Adds a polygon to the planar division and sets the value of the face inside it.
         /// It's "drawn over" the existing faces and all the edges and vertices inside it are deleted.
@@ -121,6 +125,93 @@ namespace RikusGameDevToolbox.Geometry2d
 
         }
 
+        public int NumberOfSeparateGroups()
+        {
+            return Contours().Count;
+        }
+        
+        /// <summary>
+        /// Remove separate groups of faces from the planar division and return them as list.
+        /// Largest group remains in this PlanarDivision.
+        /// Embedded faces are treated as separate groups.
+        /// </summary>
+        /// <returns></returns>
+        /// <exception cref="InvalidOperationException"></exception>
+        public List<PlanarDivision<T>> Split()
+        {
+            List<PlanarDivision<T>> result = new();
+          
+            List<OutsideFace> contours = Contours().OrderByDescending(outsideFace => outsideFace.Envelope.Area).ToList();
+            
+            for (int i=1; i < contours.Count; i++)
+            {
+                var faces = FacesInsideContour(contours[i]);
+                result.Add(SplitFaces(contours[i], faces));
+            }
+
+            return result;
+            
+            HashSet<FaceId> FacesInsideContour(OutsideFace contour)
+            {
+               Face faceInside = contour.HalfEdge.Twin.Path as Face ?? throw new InvalidOperationException("Could not get face inside contour.");
+               PathFinding<FaceId> pathFinding = new PathFinding<FaceId>
+                   (traversableNodes: faceId => Neighbours(faceId), //.Where( FaceHasValue ), 
+                       movementCost: (face1, face2) => 1f,
+                       movementCostEstimate: (face1, face2) => 1f);
+               return pathFinding.GetAllNodesConnectedTo(faceInside.Id).ToHashSet();
+            }
+            
+            PlanarDivision<T> SplitFaces(OutsideFace contour, HashSet<FaceId> faces)
+            {
+                PlanarDivision<T> result = new PlanarDivision<T>(PlanarGraph.Epsilon);
+                result.ValuelessFacesAreEmpty = ValuelessFacesAreEmpty;
+
+                result._outsideFaces.Add(contour);
+                _outsideFaces.Remove(contour);
+                _paths.Delete(contour);
+                result._paths.Insert(contour);
+
+                foreach (FaceId faceId in faces)
+                {
+                    Face face = _faces[faceId];
+                    result._faces[faceId] = face;
+                    _faces.Remove(faceId);
+                    
+              
+                    result._paths.Insert(face);
+                    _paths.Delete(face);
+                    
+                    if (_faceValues.TryGetValue(faceId, out T value))
+                    {
+                        result._faceValues[faceId] = value;
+                        _faceValues.Remove(faceId);
+                    }
+                }
+
+
+                HashSet<VertexId> vertices = result._paths.All()
+                    .SelectMany(path => PathHalfEdges(path.HalfEdge).Select(he => he.Origin))
+                    .ToHashSet();
+                
+                result.PlanarGraph = PlanarGraph.MakeDeepCopy(preserveVertexIds:true, vertexIdFilter: v => vertices.Contains(v));
+                foreach (VertexId vertexId in vertices)
+                {
+                    PlanarGraph.DeleteVertexWithoutCallingObservers(vertexId);
+                    result._incidentEdge.Add(vertexId, _incidentEdge[vertexId]);
+                    _incidentEdge.Remove(vertexId);
+                }
+                
+                
+                
+                return result;
+            }
+            
+       
+          
+        }
+
+    
+
         #endregion
         #region ---------------------------------------- PROTECTED METHODS ---------------------------------------------
         
@@ -153,6 +244,18 @@ namespace RikusGameDevToolbox.Geometry2d
         {
             base.OnFaceDestroyed(faceId);
             _faceValues.Remove(faceId);
+        }
+
+        private List<OutsideFace> Contours()
+        {
+            // TODO: This is too slow
+            return _outsideFaces.Where(IsContour).ToList();
+            
+            bool IsContour(OutsideFace face) 
+            {
+                FaceId containingFace = FaceOfPath(face);
+                return containingFace == FaceId.Empty || (ValuelessFacesAreEmpty && !_faceValues.ContainsKey(containingFace));
+            }
         }
 
         private bool FacesHaveSameValue(FaceId f1, FaceId f2)

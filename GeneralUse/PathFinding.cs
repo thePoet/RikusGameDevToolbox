@@ -63,7 +63,8 @@ namespace RikusGameDevToolbox.GeneralUse
         private readonly MovementCost _movementCostEstimate;
         private readonly TraversableNeighbours _traversableNeighbours;
 
-       
+
+      
         
         /// <param name="traversableNodes">Method that returns IEnumerable of nodes that can be reached from the node
         /// given as parameter.</param>

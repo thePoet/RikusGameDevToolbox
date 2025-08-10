@@ -1,11 +1,12 @@
 using System.Collections.Generic;
 using System.Linq;
-using JetBrains.Annotations;
 using RBush;
 using UnityEngine;
 
 namespace RikusGameDevToolbox.Geometry2d.Internal
 {
+  
+    
     internal class PlanarDivisionHoles
     {
         public delegate IEnumerable<Vector2> FaceVertexPositions(PlanarDivision.HalfEdge halfEdge);
@@ -28,14 +29,14 @@ namespace RikusGameDevToolbox.Geometry2d.Internal
         {
             var holes = _paths.Search(face.Envelope)
                 .OfType<OutsideFace>()
-                .Where(f =>  IsPathsInsideAnother(f, face))
+                .Where(f =>  IsPathInsideFace(f, face))
                 .ToList();
           
             // Remove holes that are inside other holes
-            var copy = new List<Path>(holes);
-            foreach (Path f in copy)
+            var copy = new List<OutsideFace>(holes);
+            foreach (OutsideFace f in copy)
             {
-                holes.RemoveAll(hole => hole != f && IsPathsInsideAnother(hole, f));
+                holes.RemoveAll(hole => hole != f && IsPathInsideOutsideFace(hole, f));
             }
 
             return holes;
@@ -44,33 +45,34 @@ namespace RikusGameDevToolbox.Geometry2d.Internal
         /// <summary>
         ///  Returns the smallest normal face that contains the outside face, or null if it is not contained in any face.
         /// </summary>
-        [CanBeNull]
         public Face FaceContaining(OutsideFace hole)
         {
             Vector2 pointOnFace = _faceVertexPositions(hole.HalfEdge).FirstOrDefault();
+            var candidates = _paths.Search(pointOnFace);
+            
             return _paths.Search(pointOnFace)
                 .OfType<Face>()
-                .Where(face => IsPathsInsideAnother(hole, face))
+                .Where(face => IsPathInsideFace(hole, face))
                 .OrderBy(face => face.Envelope.Area)
                 .FirstOrDefault();
         }
         
-    
-        
-        private bool IsPathsInsideAnother(Path path, Path anotherPath)
-        {
-            //Assuming the edges do not cross, we can just check if all vertices of a are inside b
-            return _faceVertexPositions(path.HalfEdge)  
-                .All(vPos => IsPointInsidePath(vPos, anotherPath));
-        }
 
-        private bool IsPointInsidePath(Vector2 position, Path path)
+        //TODO: somewhat slow:
+        private bool IsPathInsideFace(Path path, Face face)
         {
-            var polygon = path is Face
-                ? new SimplePolygon(_faceVertexPositions(path.HalfEdge)) 
-                : new SimplePolygon(_faceVertexPositions(path.HalfEdge).Reverse());
-            return polygon.IsPointInside(position);
+            SimplePolygon facePolygon = new SimplePolygon(_faceVertexPositions(face.HalfEdge).ToArray());
+            Vector2 pointOnPath = _faceVertexPositions(path.HalfEdge).First();
+            return facePolygon.IsPointInside(pointOnPath);
         }
+        //TODO: somewhat slow:
+        private bool IsPathInsideOutsideFace(Path path, OutsideFace outsideFace)
+        {
+            SimplePolygon facePolygon = new SimplePolygon(_faceVertexPositions(outsideFace.HalfEdge).Reverse().ToArray());
+            Vector2 pointOnPath = _faceVertexPositions(path.HalfEdge).First();
+            return facePolygon.IsPointInside(pointOnPath);
+        }
+ 
         
 
 

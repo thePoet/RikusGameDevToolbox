@@ -58,7 +58,7 @@ namespace RikusGameDevToolbox.Geometry2d
 
         public readonly ObserverMethods Observers = new();
 
-        private readonly float _epsilon;
+        public readonly float Epsilon;
         private readonly SpatialCollection2d<Vertex> _vertices = new();
         private readonly Dictionary<VertexId, Vertex> _verticesById = new();
         private readonly RBush<Edge> _edges = new();
@@ -79,7 +79,7 @@ namespace RikusGameDevToolbox.Geometry2d
         /// <param name="epsilon">Vertices closer than epsilon are considered the same vertex.</param>
         public PlanarGraph(float epsilon = 0.0001f)
         {
-            _epsilon = epsilon;
+            Epsilon = epsilon;
         }
         
         public void Clear()
@@ -192,6 +192,23 @@ namespace RikusGameDevToolbox.Geometry2d
             _vertices.Remove(vertex.Position, vertex);
             Observers.OnDeleteVertex?.Invoke(id);
         }
+        
+        internal void DeleteVertexWithoutCallingObservers(VertexId id) // Hack, remove
+        {
+            Vertex vertex = _verticesById.GetValueOrDefault(id); 
+            if (vertex == null) throw new ArgumentException("Vertex not found");
+           
+            foreach (var edge in vertex.Edges.ToList())
+            {
+                edge.VertexA.Edges.Remove(edge);
+                edge.VertexB.Edges.Remove(edge);
+                _edges.Delete(edge);
+            }
+
+            _verticesById.Remove(id);
+            _vertices.Remove(vertex.Position, vertex);
+        }
+        
 
         public void DeleteVerticesWithoutEdges()
         {
@@ -238,7 +255,7 @@ namespace RikusGameDevToolbox.Geometry2d
         /// </summary>
         public VertexId VertexAt(Vector2 position)
         {
-            return _vertices.ItemsInCircle(position, _epsilon).FirstOrDefault()?.Id;
+            return _vertices.ItemsInCircle(position, Epsilon).FirstOrDefault()?.Id;
         }
         
         /// <summary>
@@ -266,7 +283,48 @@ namespace RikusGameDevToolbox.Geometry2d
             
             RebuildSpatialCollections();
         }
+        
+        /// <summary>
+        /// Makes a deep copy of the planar graph.
+        /// </summary>
+        /// <param name="preserveVertexIds"></param>
+        /// <param name="vertexIdFilter">Function that takes VertexId as parameter that returns true if the vertex is to be copied. </param>
+        public PlanarGraph MakeDeepCopy(bool preserveVertexIds = true, Func<VertexId, bool> vertexIdFilter = null)
+        {
+            if (vertexIdFilter == null) vertexIdFilter = _ => true;
+            
+            var copy = new PlanarGraph(Epsilon);
+            
+            Dictionary<Vertex, Vertex> vertexLookup = new Dictionary<Vertex, Vertex>();
+            
+            foreach (var vertex in _verticesById.Values)
+            {
+                if (!vertexIdFilter(vertex.Id)) continue;
+                Vertex newVertex = new()
+                {
+                    Id = preserveVertexIds ? vertex.Id : VertexId.New(),
+                    Position = vertex.Position
+                };
+                vertexLookup[vertex] = newVertex;
+                copy._vertices.Add(newVertex.Position, newVertex);
+                copy._verticesById[newVertex.Id] = newVertex;
+            } 
 
+            foreach (var edge in _edges.All() )
+            {
+                if (!vertexIdFilter(edge.VertexA.Id) || !vertexIdFilter(edge.VertexB.Id)) continue;
+                
+                Edge newEdge = new Edge(vertexLookup[edge.VertexA], vertexLookup[edge.VertexB]);
+                newEdge.VertexA.Edges.Add(newEdge);
+                newEdge.VertexB.Edges.Add(newEdge);
+                copy._edges.Insert(newEdge);
+            }
+
+            return copy;
+
+   
+        }
+      
         
         #endregion
 
@@ -277,7 +335,7 @@ namespace RikusGameDevToolbox.Geometry2d
         {
             if (ContainsNan(position)) throw new ArgumentException("Tried to add vertex with NaN position");
             
-            var existingVertex = _vertices.ItemsInCircle(position, _epsilon).FirstOrDefault();
+            var existingVertex = _vertices.ItemsInCircle(position, Epsilon).FirstOrDefault();
             if (existingVertex != null) return existingVertex;
 
 
@@ -340,7 +398,7 @@ namespace RikusGameDevToolbox.Geometry2d
             // Set the position exactly on the edge:
             var correctedPosition = GeometryUtils.ProjectPointOnEdge(position, oldEdge.VertexA.Position, oldEdge.VertexB.Position);
 
-            var existing = _vertices.ItemsInCircle(correctedPosition, _epsilon).FirstOrDefault();
+            var existing = _vertices.ItemsInCircle(correctedPosition, Epsilon).FirstOrDefault();
             if (existing != null)
             {
                 if (existing == edge.VertexA || existing == edge.VertexB)
@@ -410,7 +468,7 @@ namespace RikusGameDevToolbox.Geometry2d
 
             var result = _vertices.ItemsInRectangle(searchArea)
                 .Where(vertex => vertex != start && vertex != end &&
-                                 GeometryUtils.IsPointOnEdge(vertex.Position, start.Position, end.Position, _epsilon))
+                                 GeometryUtils.IsPointOnEdge(vertex.Position, start.Position, end.Position, Epsilon))
                 .OrderBy(v => Vector2.Distance(start.Position, v.Position))
                 .ToList();
 
@@ -423,10 +481,10 @@ namespace RikusGameDevToolbox.Geometry2d
         private List<Edge> EdgesWithinEpsilon(Vector2 position)
         {
             // Rect with side length of 2 * _epsilon with given position as center:
-            var smallRect = new Rect(position.x - _epsilon, position.y - _epsilon, _epsilon*2f, _epsilon*2f);
+            var smallRect = new Rect(position.x - Epsilon, position.y - Epsilon, Epsilon*2f, Epsilon*2f);
             
             return EdgesIntersectingRect(smallRect)
-                .Where(edge => GeometryUtils.IsPointOnEdge(position,edge.VertexA.Position,edge.VertexB.Position, _epsilon))
+                .Where(edge => GeometryUtils.IsPointOnEdge(position,edge.VertexA.Position,edge.VertexB.Position, Epsilon))
                 .ToList();
 
         }
@@ -462,7 +520,7 @@ namespace RikusGameDevToolbox.Geometry2d
         private Rect RectAroundEdge(Vertex va, Vertex vb)
         {
             var rect = RectExtensions.CreateRectToEncapsulate(va.Position, vb.Position);
-            rect = rect.Grow(2f*_epsilon);
+            rect = rect.Grow(2f*Epsilon);
             return rect;
         }
         

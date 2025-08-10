@@ -1,4 +1,5 @@
 
+using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
 using Clipper2Lib;
@@ -6,6 +7,23 @@ using UnityEngine;
 
 namespace RikusGameDevToolbox.Geometry2d
 {
+    /*
+    public class PathVector2 
+    {
+        private readonly Vector2[] _points;
+
+        public PathVector2(IEnumerable<Vector2> points)
+        {
+            _points = points.ToArray();
+        }
+        
+        public int Count => _points.Length;
+        
+        public Vector2 this[int i] => _points[i];
+        
+    }*/
+    
+    
     /// <summary>
     /// Utility functions for working with paths of polygons
     /// </summary>
@@ -28,11 +46,12 @@ namespace RikusGameDevToolbox.Geometry2d
         /// <summary>
         /// Returns the pairs of vertex positions on a path. The last pair is the last and the first vertex.
         /// </summary>
-        public static IEnumerable<(Vector2, Vector2)> VertexPairs(IReadOnlyCollection<Vector2> path)
+        public static IEnumerable<(Vector2, Vector2)> VertexPairs(IEnumerable<Vector2> path)
         {
-            for (int i = 0; i < path.Count; i++)
+            int count = path.Count();
+            for (int i = 0; i < count; i++)
             {
-                yield return i == path.Count - 1
+                yield return i == count - 1
                     ? (path.ElementAt(i), path.ElementAt(0))
                     : (path.ElementAt(i), path.ElementAt(i + 1));
             }
@@ -44,8 +63,17 @@ namespace RikusGameDevToolbox.Geometry2d
         }
 
         public static bool IsCounterClockwise(Vector2[] path) => IsCounterClockwise(ToPathD(path));
+        
         public static bool IsClockWise(Vector2[] path) => IsClockwise(ToPathD(path));
 
+        public static bool IsPointOn(Vector2 point, IEnumerable<Vector2> path, float maxDistance)
+        {
+            foreach ( (Vector2 edgeStart, Vector2 edgeEnd) in VertexPairs(path))
+            {
+                if (GeometryUtils.IsPointOnEdge(point, edgeStart, edgeEnd, maxDistance)) return true;
+            }
+            return false;
+        }
         
         
         internal static Vector2[] ToVector2Array(PathD path)

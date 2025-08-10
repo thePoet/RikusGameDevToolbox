@@ -24,12 +24,13 @@ namespace RikusGameDevToolbox.Geometry2d
             public VertexId Target => Twin.Origin; 
         }
 
-        protected readonly PlanarGraph PlanarGraph;
+        protected PlanarGraph PlanarGraph;
         
-        private readonly Dictionary<VertexId, HalfEdge> _incidentEdge = new(); // Random half edge starting from the vertex
-        private readonly Dictionary<FaceId, Face> _faces = new();
-        private readonly RBush<Path> _paths = new();
-        private readonly PlanarDivisionHoles _holes; 
+        internal readonly Dictionary<VertexId, HalfEdge> _incidentEdge = new(); // Random half edge starting from the vertex
+        internal readonly Dictionary<FaceId, Face> _faces = new();
+        internal readonly HashSet<OutsideFace> _outsideFaces = new();
+        internal readonly RBush<Path> _paths = new();
+        internal readonly PlanarDivisionHoles _holes; 
     
        
         #region ----------------------------------------- PUBLIC PROPERTIES --------------------------------------------
@@ -436,6 +437,7 @@ namespace RikusGameDevToolbox.Geometry2d
             }
             _paths.Insert(path);
             if (path is Face face) _faces.Add(face.Id, face);
+            if (path is OutsideFace outsideFace) _outsideFaces.Add(outsideFace);
 
             return path;
 
@@ -469,12 +471,6 @@ namespace RikusGameDevToolbox.Geometry2d
         {
             if (!_paths.Delete(path))
             {
-                
-               foreach (var p in _paths.All())
-               {
-                   if (p==path) Debug.Log("Found path with envelope: " + p.Envelope);
-               }
-
                throw new InvalidOperationException("Deleting path from spatial collection failed.");
             }
             UpdateFaceEnvelope(path);
@@ -495,6 +491,11 @@ namespace RikusGameDevToolbox.Geometry2d
             if (path is Face face)
             {
                 _faces.Remove(face.Id);
+            }
+
+            if (path is OutsideFace outsideFace)
+            {
+                _outsideFaces.Remove(outsideFace);
             }
         }
 
@@ -556,7 +557,7 @@ namespace RikusGameDevToolbox.Geometry2d
            return PathHalfEdges(halfEdge).Select(he => PlanarGraph.Position(he.Origin));
         }
 
-        private IEnumerable<HalfEdge> PathHalfEdges(HalfEdge first)
+        internal IEnumerable<HalfEdge> PathHalfEdges(HalfEdge first)
         {
             var current = first;
             for (int i = 0; i < 10000; i++)
@@ -602,7 +603,7 @@ namespace RikusGameDevToolbox.Geometry2d
         }
  
         /// <summary> Returns the Id of the face that the path belongs to as either a contour or a hole.</summary>
-        private FaceId FaceOfPath(Path path)
+        internal FaceId FaceOfPath(Path path)
         {
             if (path is Face face) return face.Id;
             if (path is OutsideFace outsideFace)

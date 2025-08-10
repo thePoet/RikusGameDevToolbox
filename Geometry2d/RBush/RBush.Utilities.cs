@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using UnityEngine;
 
 namespace RBush
 {
@@ -9,6 +10,8 @@ namespace RBush
 
 	public partial class RBush<T>
 	{
+		public bool isDebugLogginOn = false;
+		
 		#region Sort Functions
 
 		private static readonly IComparer<ISpatialData> s_compareMinX =
@@ -23,6 +26,9 @@ namespace RBush
 
 		private List<T> DoSearch(in Envelope boundingBox)
 		{
+			if (isDebugLogginOn) Debug.Log("------ Start search: " + boundingBox);
+			float t=Time.realtimeSinceStartup;
+				
 			if (!Root.Envelope.Intersects(boundingBox))
 				return new List<T>();
 
@@ -47,11 +53,15 @@ namespace RBush
 					foreach (var i in item.Items)
 					{
 						if (i.Envelope.Intersects(boundingBox))
+						{
 							queue.Enqueue((Node)i);
+						}
 					}
 				}
 			}
 
+			float timeMs = 1000f * (Time.realtimeSinceStartup - t);
+			if (isDebugLogginOn) Debug.Log("------ End search, took: " + timeMs + " ms");
 			return intersections;
 		}
 
