@@ -56,7 +56,7 @@ namespace RikusGameDevToolbox.Geometry2d
             }
         }
 
-        public readonly ObserverMethods Observers = new();
+        public ObserverMethods Observers = new();
 
         public readonly float Epsilon;
         private readonly SpatialCollection2d<Vertex> _vertices = new();

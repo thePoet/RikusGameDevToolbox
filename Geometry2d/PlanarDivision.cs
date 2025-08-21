@@ -24,13 +24,13 @@ namespace RikusGameDevToolbox.Geometry2d
             public VertexId Target => Twin.Origin; 
         }
 
-        protected PlanarGraph PlanarGraph;
+        protected internal PlanarGraph PlanarGraph;
         
-        internal readonly Dictionary<VertexId, HalfEdge> _incidentEdge = new(); // Random half edge starting from the vertex
-        internal readonly Dictionary<FaceId, Face> _faces = new();
-        internal readonly HashSet<OutsideFace> _outsideFaces = new();
-        internal readonly RBush<Path> _paths = new();
-        internal readonly PlanarDivisionHoles _holes; 
+        internal Dictionary<VertexId, HalfEdge> _incidentEdge = new(); // Random half edge starting from the vertex
+        internal Dictionary<FaceId, Face> _faces = new();
+        internal HashSet<OutsideFace> _outsideFaces = new();
+        internal RBush<Path> _paths = new();
+        internal PlanarDivisionHoles _holes; 
     
        
         #region ----------------------------------------- PUBLIC PROPERTIES --------------------------------------------
@@ -56,6 +56,8 @@ namespace RikusGameDevToolbox.Geometry2d
         #endregion
         #region ------------------------------------------ PUBLIC METHODS -----------------------------------------------
 
+        public PlanarGraph TestDeepCopyOfGraph() => PlanarGraph.MakeDeepCopy();
+        
         public PlanarDivision(float epsilon = 0.00001f) 
         {
             PlanarGraph = new PlanarGraph(epsilon)
@@ -76,7 +78,13 @@ namespace RikusGameDevToolbox.Geometry2d
         {
             HalfEdge halfEdge = GetHalfEdge(v1, v2);
             if (halfEdge == null) throw new ArgumentException("Edge does not exist.");
-            return FaceOfPath(halfEdge.Path);
+            if (halfEdge.Path is Face face) return face.Id;
+            if (halfEdge.Path is OutsideFace outsideFace)
+            {
+                var containingFace = _holes.FaceContaining(outsideFace);
+                if (containingFace != null) return containingFace.Id;
+            }
+            return FaceId.Empty;
         }
         
         public FaceId FaceLeftOfEdge(Vector2 pos1, Vector2 pos2)
@@ -156,7 +164,30 @@ namespace RikusGameDevToolbox.Geometry2d
             PlanarGraph.DeleteVertex(id);
             return true;
         }
-                
+        /*
+        public PlanarDivision MakeShallowCopy()
+        {
+            PlanarDivision result = new PlanarDivision(PlanarGraph.Epsilon)
+            {
+                PlanarGraph = PlanarGraph
+            };
+            result.PlanarGraph.Observers.OnAddVertex = result.OnAddVertex;
+            result.PlanarGraph.Observers.OnAddEdge = result.OnAddEdge;
+            result.PlanarGraph.Observers.OnSplitEdge = result.OnSplitEdge;
+            result.PlanarGraph.Observers.OnDeleteVertex = result.OnDeleteVertex;
+            result.PlanarGraph.Observers.OnDeleteEdge = result.OnDeleteEdge;
+
+            result._incidentEdge = _incidentEdge;
+            result._faces = _faces;
+            result._outsideFaces = _outsideFaces;
+            result._paths = _paths;
+            result._holes = new PlanarDivisionHoles(_paths, result.FaceVertexPositions);
+
+          
+            return result;
+        }
+        */
+        
         #endregion
         #region ---------------------------------------- PROTECTED METHODS ---------------------------------------------
 
@@ -182,19 +213,19 @@ namespace RikusGameDevToolbox.Geometry2d
         #endregion
         #region ------------------------------------------ PRIVATE METHODS ----------------------------------------------
 
-        private void OnAddVertex(VertexId vertexId)
+        internal void OnAddVertex(VertexId vertexId)
         {
             _incidentEdge[vertexId] = null;
         }
-        
-        private void OnAddEdge(VertexId v1, VertexId v2)
+
+        internal void OnAddEdge(VertexId v1, VertexId v2)
         {
             if (v1==v2) Debug.LogWarning("Tried to add edge with same vertices: " + v1 + " and " + v2);
             var (halfEdge1, halfEdge2) = AddHalfEdgePairBetweenVertices(v1, v2);
             UpdateFacesAfterAddingHalfEdgePair(halfEdge1);
         }
-        
-        private void OnSplitEdge(VertexId v1, VertexId v2, VertexId newVertex)
+
+        internal void OnSplitEdge(VertexId v1, VertexId v2, VertexId newVertex)
         {
             _incidentEdge[newVertex] = null;
             HalfEdge oldEdge = GetHalfEdge(v1, v2);
@@ -205,12 +236,12 @@ namespace RikusGameDevToolbox.Geometry2d
             InsertVertexIntoEdge(oldEdge, newVertex);
         }
 
-        private void OnDeleteVertex(VertexId vertexId)
+        internal void OnDeleteVertex(VertexId vertexId)
         {
             _incidentEdge.Remove(vertexId);
         }
-        
-        private void OnDeleteEdge(VertexId v1, VertexId v2)
+
+        internal void OnDeleteEdge(VertexId v1, VertexId v2)
         {
             HalfEdge halfEdge = GetHalfEdge(v1, v2);
             DeleteHalfEdgeTwins(halfEdge);
@@ -266,6 +297,8 @@ namespace RikusGameDevToolbox.Geometry2d
 
         private void UpdateFacesAfterAddingHalfEdgePair(HalfEdge edge)
         {
+        
+
             if (IsOnlyEdgeAtOrigin(edge) && IsOnlyEdgeAtTarget(edge)) // New unconnected edge, so create a new path:
             {
                 CreateAndSetNewPathFrom(edge);
@@ -291,6 +324,7 @@ namespace RikusGameDevToolbox.Geometry2d
             
             var path1 = edge.Next.Path;
             var path2 = edge.Twin.Next.Path;
+            bool connectingVerticesInSamePath = path1 == path2;
 
             DeletePath(path1);
             
@@ -303,7 +337,8 @@ namespace RikusGameDevToolbox.Geometry2d
                 ? CreateAndSetNewPathFrom(edge.Twin) 
                 : newPath1; // In case both faces are the same. (Happens when two boundary faces are merged)
            
-            if (path1==path2 && path1 is Face face)
+            
+            if (connectingVerticesInSamePath && path1 is Face face)
             {
                 if (newPath1 is Face newFace1 && newPath2 is Face newFace2)
                 {
@@ -315,7 +350,7 @@ namespace RikusGameDevToolbox.Geometry2d
                 }
             }
             
-            if (path1==path2 && path1 is OutsideFace outsideFace)
+            if (connectingVerticesInSamePath && path1 is OutsideFace outsideFace)
             {
                 if (newPath1 is Face face1 && newPath2 is OutsideFace)
                 {
@@ -328,7 +363,7 @@ namespace RikusGameDevToolbox.Geometry2d
                     return;
                 }
 
-                DebugLine = PathPositions(path1.HalfEdge);
+               // DebugLine = PathPositions(path1.HalfEdge);
 
                 throw new Exception("Something went wrong when ");
             }
@@ -367,8 +402,8 @@ namespace RikusGameDevToolbox.Geometry2d
             edge.Twin.Origin = newVertex;
 
         }
-        
-        private void DeleteHalfEdgeTwins(HalfEdge edge)
+
+        internal void DeleteHalfEdgeTwins(HalfEdge edge)
         {
             bool onlyEdgeFromOrigin = edge.Previous == edge.Twin;
 
@@ -552,7 +587,7 @@ namespace RikusGameDevToolbox.Geometry2d
         }
 
 
-        private IEnumerable<Vector2> FaceVertexPositions(HalfEdge halfEdge)
+        internal IEnumerable<Vector2> FaceVertexPositions(HalfEdge halfEdge)
         {
            return PathHalfEdges(halfEdge).Select(he => PlanarGraph.Position(he.Origin));
         }
@@ -624,7 +659,7 @@ namespace RikusGameDevToolbox.Geometry2d
                                          MaxY:rect.yMax);
         }
 
-        private Face FaceOrThrow(FaceId faceId)
+        internal Face FaceOrThrow(FaceId faceId)
         {
             return _faces.TryGetValue(faceId, out var face) ? face : throw new ArgumentException("No face with given id.");
         }

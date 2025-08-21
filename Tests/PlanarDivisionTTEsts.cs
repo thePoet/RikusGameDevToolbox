@@ -78,6 +78,37 @@ namespace RikusGameDevToolbox.Tests
         }
 
         [Test]
+        public void SplitPolygonWithLine()
+        {
+            var pd = new PlanarDivision<Color>();
+            SimplePolygon square = new(_squareCorners);
+            pd.AddPolygonOver(square, Color.red);
+            pd.AddLine(new Vector2(0f, 0f), new Vector2(10f, 10f));
+            var face1 = pd.FaceLeftOfEdge(new Vector2(0f, 0f), new Vector2(10f, 0f));
+            var face2 = pd.FaceLeftOfEdge(new Vector2(0f, 10f), new Vector2(0f, 0f));
+            pd.TryGetValue(face1, out Color c1);
+            Assert.IsTrue(c1 == Color.red);
+            pd.TryGetValue(face2, out Color c2);
+            Assert.IsTrue(c2 == Color.red);
+        }
+        
+        [Test]
+        public void SplitPolygonWithTwoLines()
+        {
+            var pd = new PlanarDivision<Color>();
+            SimplePolygon square = new(_squareCorners);
+            pd.AddPolygonOver(square, Color.red);
+            pd.AddLine(new Vector2(0f, 0f), new Vector2(5f, 5f));
+            pd.AddLine(new Vector2(5f, 5f), new Vector2(10f, 10f));
+            var face1 = pd.FaceLeftOfEdge(new Vector2(0f, 0f), new Vector2(10f, 0f));
+            var face2 = pd.FaceLeftOfEdge(new Vector2(0f, 10f), new Vector2(0f, 0f));
+            pd.TryGetValue(face1, out Color c1);
+            Assert.IsTrue(c1 == Color.red);
+            pd.TryGetValue(face2, out Color c2);
+            Assert.IsTrue(c2 == Color.red);
+        }
+
+        [Test]
         public void AddNestedFaces()
         {
             var pd = new PlanarDivision<Color>();

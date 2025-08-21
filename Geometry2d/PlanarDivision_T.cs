@@ -16,10 +16,30 @@ namespace RikusGameDevToolbox.Geometry2d
         
         private readonly Dictionary<FaceId, T> _faceValues = new();
 
+        private bool _setDefaultValueForNewFaces = false;
+        private T _defaultValue; 
 
         #region ------------------------------------------ PUBLIC METHODS -----------------------------------------------
 
         public PlanarDivision(float epsilon = 0.00001f) : base(epsilon) { }
+        
+        public PlanarDivision(PlanarDivision planarDivision)
+        {
+            PlanarGraph = planarDivision.PlanarGraph;
+     
+            PlanarGraph.Observers.OnAddVertex = OnAddVertex;
+            PlanarGraph.Observers.OnAddEdge = OnAddEdge;
+            PlanarGraph.Observers.OnSplitEdge = OnSplitEdge;
+            PlanarGraph.Observers.OnDeleteVertex = OnDeleteVertex;
+            PlanarGraph.Observers.OnDeleteEdge = OnDeleteEdge;
+
+            _incidentEdge = planarDivision._incidentEdge;
+            _faces = planarDivision._faces;
+            _outsideFaces = planarDivision._outsideFaces;
+            _paths = planarDivision._paths;
+            _holes = new PlanarDivisionHoles(_paths, FaceVertexPositions);
+     
+        }
         
         public bool TryGetValue(FaceId faceId, out T value)
         {
@@ -43,6 +63,11 @@ namespace RikusGameDevToolbox.Geometry2d
             if (_faceValues.TryGetValue(faceId, out T value)) return value;
             return default!;
         }
+        
+        public IEnumerable<T> Values()
+        {
+            return _faceValues.Values;
+        }
     
         
         public bool FaceHasValue(FaceId faceId)
@@ -58,13 +83,52 @@ namespace RikusGameDevToolbox.Geometry2d
 
         public bool RemoveValue(FaceId faceId)
         {
+            if (faceId == FaceId.Empty) throw new InvalidOperationException("Tried to remove value of FaceId.Empty.");
             return _faceValues.Remove(faceId);
         }
 
-        // Deletes
+        /// <summary>
+        /// Deletes a face by removing all its edges that are not shared with another face.
+        /// If ValuelessFacesAreEmpty is true, edges shared with valueless faces are also removed.
+        /// </summary>
         public void DeleteFace(FaceId faceId)
         {
-            throw new NotImplementedException();
+            if (faceId == FaceId.Empty) throw new InvalidOperationException("Tried to delete empty face.");
+            if (FaceHasValue(faceId)) RemoveValue(faceId);
+            Face face = FaceOrThrow(faceId);
+
+            var edgesToDelete = PathHalfEdges(face.HalfEdge)
+                .Where(he => he.Twin.Path is OutsideFace || (ValuelessFacesAreEmpty && he.Twin.Path is Face twinFace && !FaceHasValue(twinFace.Id)))
+                .ToList();
+
+            edgesToDelete.ForEach(edge => PlanarGraph.DeleteEdge(edge.Origin, edge.Twin.Origin));
+        }
+        
+        /// <summary>
+        /// Polygons in the shape of the planar division. If ValuelessFacesAreEmpty is true, the faces without values
+        /// are considered holes.
+        /// </summary>
+        /// <param name="lookForEmbeddedFaces"></param>
+        /// <returns></returns>
+        public List<Polygon> Shape(bool lookForEmbeddedFaces)
+        {
+            if (lookForEmbeddedFaces) throw new NotImplementedException("lookForEmbeddedFaces not implemented yet.");
+
+            var polygonPaths = new List<List<Vector2>>();
+            foreach (OutsideFace outsideFace in _outsideFaces)
+            {
+                polygonPaths.Add(FaceVertexPositions(outsideFace.HalfEdge).ToList());
+            }
+
+            if (ValuelessFacesAreEmpty)
+            {
+                foreach (Face emptyFace in ValuelessFaces())
+                {
+                    polygonPaths.Add(FaceVertexPositions(emptyFace.HalfEdge).ToList());
+                }
+            }
+            
+            return Polygon.CreateFromPaths(polygonPaths);
         }
         
         /// <summary>
@@ -125,9 +189,57 @@ namespace RikusGameDevToolbox.Geometry2d
 
         }
 
-        public int NumberOfSeparateGroups()
+
+        public void AddLineAndSetValueForNewFaces(Vector2 p1, Vector2 p2, T value)
         {
-            return Contours().Count;
+            _setDefaultValueForNewFaces = true;
+            _defaultValue = value; 
+            PlanarGraph.AddLine(p1, p2);
+            _setDefaultValueForNewFaces = false;
+        }
+        
+/*
+        /// <summary>
+        /// SHALLOW COPY!
+        /// </summary>
+        /// <param name="mapFunction"></param>
+        /// <typeparam name="TU"></typeparam>
+        /// <returns></returns>
+        public PlanarDivision<TU> MapValues<TU>(Func<FaceId, TU> mapFunction)
+        {
+            PlanarDivision<TU> result = new PlanarDivision<TU>(PlanarGraph.Epsilon)
+            {
+                ValuelessFacesAreEmpty = ValuelessFacesAreEmpty,
+                PlanarGraph = PlanarGraph
+            };
+            result.PlanarGraph.Observers.OnAddVertex = result.OnAddVertex;
+            result.PlanarGraph.Observers.OnAddEdge = result.OnAddEdge;
+            result.PlanarGraph.Observers.OnSplitEdge = result.OnSplitEdge;
+            result.PlanarGraph.Observers.OnDeleteVertex = result.OnDeleteVertex;
+            result.PlanarGraph.Observers.OnDeleteEdge = result.OnDeleteEdge;
+
+            result._incidentEdge = _incidentEdge;
+            result._faces = _faces;
+            result._outsideFaces = _outsideFaces;
+            result._paths = _paths;
+            result._holes = new PlanarDivisionHoles(_paths, FaceVertexPositions);
+
+            foreach (FaceId id in _faces.Keys)
+            {
+                TU newValue = mapFunction(id);
+                if (newValue != null)
+                    result._faceValues[id] = newValue;
+            }
+            return result;
+        }
+*/
+
+
+
+        public int NumberOfSeparateGroups(bool lookForEmbeddedFaces)
+        {
+            if (lookForEmbeddedFaces) throw new NotImplementedException("lookForEmbeddedFaces not implemented yet.");
+            return _outsideFaces.Count;
         }
         
         /// <summary>
@@ -137,11 +249,15 @@ namespace RikusGameDevToolbox.Geometry2d
         /// </summary>
         /// <returns></returns>
         /// <exception cref="InvalidOperationException"></exception>
-        public List<PlanarDivision<T>> Split()
+        public List<PlanarDivision<T>> Split(bool lookForEmbeddedFaces)
         {
+            if (lookForEmbeddedFaces) throw new NotImplementedException("lookForEmbeddedFaces not implemented yet.");
+ 
             List<PlanarDivision<T>> result = new();
           
-            List<OutsideFace> contours = Contours().OrderByDescending(outsideFace => outsideFace.Envelope.Area).ToList();
+            List<OutsideFace> contours = _outsideFaces.OrderByDescending(outsideFace => outsideFace.Envelope.Area).ToList();
+            
+            
             
             for (int i=1; i < contours.Count; i++)
             {
@@ -176,7 +292,6 @@ namespace RikusGameDevToolbox.Geometry2d
                     Face face = _faces[faceId];
                     result._faces[faceId] = face;
                     _faces.Remove(faceId);
-                    
               
                     result._paths.Insert(face);
                     _paths.Delete(face);
@@ -194,6 +309,7 @@ namespace RikusGameDevToolbox.Geometry2d
                     .ToHashSet();
                 
                 result.PlanarGraph = PlanarGraph.MakeDeepCopy(preserveVertexIds:true, vertexIdFilter: v => vertices.Contains(v));
+
                 foreach (VertexId vertexId in vertices)
                 {
                     PlanarGraph.DeleteVertexWithoutCallingObservers(vertexId);
@@ -201,16 +317,10 @@ namespace RikusGameDevToolbox.Geometry2d
                     _incidentEdge.Remove(vertexId);
                 }
                 
-                
-                
                 return result;
             }
-            
-       
           
         }
-
-    
 
         #endregion
         #region ---------------------------------------- PROTECTED METHODS ---------------------------------------------
@@ -220,6 +330,15 @@ namespace RikusGameDevToolbox.Geometry2d
         protected override void OnFaceSplit(FaceId oldFaceId, FaceId newFaceId1, FaceId newFaceId2)
         {
             base.OnFaceSplit(oldFaceId, newFaceId1, newFaceId2);
+
+            if (_setDefaultValueForNewFaces)
+            {
+                _faceValues[newFaceId1] = _defaultValue;
+                _faceValues[newFaceId2] = _defaultValue;
+                if (!_faceValues.ContainsKey(oldFaceId)) _faceValues.Remove(oldFaceId);
+                return;
+            }
+
             if (!_faceValues.ContainsKey(oldFaceId)) return;
             _faceValues[newFaceId1] = _faceValues[oldFaceId];
             _faceValues[newFaceId2] = _faceValues[oldFaceId];
@@ -245,17 +364,21 @@ namespace RikusGameDevToolbox.Geometry2d
             base.OnFaceDestroyed(faceId);
             _faceValues.Remove(faceId);
         }
-
-        private List<OutsideFace> Contours()
+        
+        protected override void OnFaceCreated(FaceId faceId)
         {
-            // TODO: This is too slow
-            return _outsideFaces.Where(IsContour).ToList();
-            
-            bool IsContour(OutsideFace face) 
+            base.OnFaceCreated(faceId);
+            if (_setDefaultValueForNewFaces)
             {
-                FaceId containingFace = FaceOfPath(face);
-                return containingFace == FaceId.Empty || (ValuelessFacesAreEmpty && !_faceValues.ContainsKey(containingFace));
+                _faceValues[faceId] = _defaultValue;
             }
+        }
+
+        
+        private List<Face> ValuelessFaces()
+        {
+            // TODO: Slow, might be good to track these in a HashSet
+            return _faces.Values.Where(face => !_faceValues.ContainsKey(face.Id)).ToList();
         }
 
         private bool FacesHaveSameValue(FaceId f1, FaceId f2)
