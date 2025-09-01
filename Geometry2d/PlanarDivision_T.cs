@@ -257,8 +257,6 @@ namespace RikusGameDevToolbox.Geometry2d
           
             List<OutsideFace> contours = _outsideFaces.OrderByDescending(outsideFace => outsideFace.Envelope.Area).ToList();
             
-            
-            
             for (int i=1; i < contours.Count; i++)
             {
                 var faces = FacesInsideContour(contours[i]);
@@ -309,7 +307,13 @@ namespace RikusGameDevToolbox.Geometry2d
                     .ToHashSet();
                 
                 result.PlanarGraph = PlanarGraph.MakeDeepCopy(preserveVertexIds:true, vertexIdFilter: v => vertices.Contains(v));
-
+                result.PlanarGraph.Observers.OnAddEdge = result.OnAddEdge;
+                result.PlanarGraph.Observers.OnAddVertex = result.OnAddVertex;
+                result.PlanarGraph.Observers.OnSplitEdge = result.OnSplitEdge;      
+                result.PlanarGraph.Observers.OnDeleteEdge = result.OnDeleteEdge;
+                result.PlanarGraph.Observers.OnDeleteVertex = result.OnDeleteVertex;
+                
+      
                 foreach (VertexId vertexId in vertices)
                 {
                     PlanarGraph.DeleteVertexWithoutCallingObservers(vertexId);

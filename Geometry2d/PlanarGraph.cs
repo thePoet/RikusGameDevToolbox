@@ -2,7 +2,6 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using RikusGameDevToolbox.GeneralUse;
-using RBush;
 using UnityEngine;
 using static RikusGameDevToolbox.Geometry2d.Util;
 
@@ -25,53 +24,27 @@ namespace RikusGameDevToolbox.Geometry2d
             public Action<VertexId, VertexId> OnDeleteEdge;
         }
         
-        private class Vertex
-        {
-            public VertexId Id;
-            public Vector2 Position;
-            public List<Edge> Edges = new();
-            public IEnumerable<Vertex> Connections => Edges.Select(e => e.VertexA == this ? e.VertexB : e.VertexA);
-            public Edge EdgeConnectingTo(Vertex v) => Edges.FirstOrDefault(e => e.VertexA == v || e.VertexB == v);
-            public override string ToString() => $"Vertex: {Id} ({Position.x}, {Position.y})";
-        }
-
-        private class Edge : ISpatialData
-        {
-            public Vertex VertexA { get; }
-            public Vertex VertexB { get; }
-            public Envelope Envelope { get; private set; }
-            public override string ToString() => $"Edge: {VertexA} - {VertexB}";
-
-            public Edge(Vertex vertexA, Vertex vertexB)
-            {
-                VertexA = vertexA;
-                VertexB = vertexB;
-                UpdateEnvelope();
-            }
-            
-            public void UpdateEnvelope()
-            {
-                Rect rect = RectExtensions.CreateRectToEncapsulate(VertexA.Position, VertexB.Position);
-                Envelope = new Envelope(rect.xMin, rect.yMin, rect.xMax, rect.yMax);
-            }
-        }
 
         public ObserverMethods Observers = new();
 
         public readonly float Epsilon;
-        private readonly SpatialCollection2d<Vertex> _vertices = new();
-        private readonly Dictionary<VertexId, Vertex> _verticesById = new();
-        private readonly RBush<Edge> _edges = new();
+        private IEdgeSpatialCollection _edges = new EdgesSpatial();
 
         #region ----------------------------------- PUBLIC METHODS & PROPERTIES ----------------------------------------
 
-        public int NumEdges => _edges.Count;
-        public int NumVertices => _verticesById.Count;
-        public List<(VertexId v1, VertexId v2)> Edges => _edges.All().Select(e => (e.VertexA.Id, e.VertexB.Id)).ToList();
-        public List<(Vector2 v1, Vector2 v2)> EdgeVertexPositions => _edges.All().Select(e => (e.VertexA.Position, e.VertexB.Position)).ToList();
-
-        public List<VertexId> Vertices => _verticesById.Keys.ToList();
-
+        public int NumEdges => _edges.NumEdges;
+        public int NumVertices => _edges.NumVertices;
+        public IEnumerable<(VertexId v1, VertexId v2)> Edges => _edges.All();
+        public IEnumerable<(Vector2 v1, Vector2 v2)> EdgeVertexPositions => _edges.All().Select(e => (_edges.Position(e.Item1), _edges.Position(e.Item2)));
+        public IEnumerable<VertexId> Vertices => _edges.Vertices();
+        public void Clear() => _edges.Clear();
+        public Vector2 Position(VertexId vertexId) => _edges.Position(vertexId);
+        public VertexId? VertexAt(Vector2 position) => _edges.VerticesInCircle(position, Epsilon).FirstOrDefault();
+        public IEnumerable<VertexId> VerticesIn(Rect area) => _edges.VerticesIn(area);
+        public void DeleteEdge(VertexId v1, VertexId v2) => DeleteEdgeBetween(v1, v2);
+        public bool IsEdgeBetween(VertexId a, VertexId b) => _edges.ConnectedVertices(a).Contains(b);
+        public void TransformVertices(Func<Vector2, Vector2> transformFunction) => _edges.TransformVertices(transformFunction);
+        public IEnumerable<VertexId> ConnectedVertices(VertexId vertexId) => _edges.ConnectedVertices(vertexId);
 
         /// <summary>
         /// 
@@ -82,13 +55,6 @@ namespace RikusGameDevToolbox.Geometry2d
             Epsilon = epsilon;
         }
         
-        public void Clear()
-        {
-            _vertices.Clear();
-            _verticesById.Clear();
-            _edges.Clear();
-        }        
-        
         /// <summary>
         /// Adds a line between two points. If the line intersects with existing edges, it will split them and add new
         /// vertices. If the line overlaps with existing edges, these will be incorporated into the line. 
@@ -96,125 +62,101 @@ namespace RikusGameDevToolbox.Geometry2d
         /// <returns>Returns all the vertices on the line. The first is the start and last one is the end.</returns>
         public List<VertexId> AddLine(Vector2 a, Vector2 b)
         {
-          
-            Vertex va = GetOrAddVertex(a);
-            Vertex vb = GetOrAddVertex(b);
+            VertexId va = GetOrAddVertex(a);
+            VertexId vb = GetOrAddVertex(b);
 
-            if (va == vb) return new List<VertexId>{va.Id};
+            if (va.Equals(vb)) return new List<VertexId>{va};
 
             var result = new List<VertexId>();
-            var nearbyEdges = EdgesIntersectingRect(RectAroundEdge(va,vb)).ToList();
+            var nearbyEdges = _edges.EdgesIn( RectAroundEdge(va,vb)).ToList();
           
-            List<Vertex> verticesOnLine = VerticesOnLine(va, vb); // Find vertices that already exist on the line
+            List<VertexId> verticesOnLine = VerticesOnLine(va, vb); // Find vertices that already exist on the line
 
             foreach (var (v1, v2) in Pairs(verticesOnLine) )
             {
-                if (v1==v2) throw new InvalidOperationException("Something went wrong when adding a line.");
-                if (ContainsNan(v1.Position) || ContainsNan(v2.Position))
-                {
-                    throw new ArgumentException("Vertex with NaN position");
-                }
+                if (v1.Equals(v2)) throw new InvalidOperationException("Something went wrong when adding a line.");
                 
-                result.Add( v1.Id );
+                result.Add( v1 );
 
-                if (!IsEdgeBetween(v1.Id, v2.Id))
+                if (!IsEdgeBetween(v1, v2))
                 {
                     var intersections = ConnectVertices(v1, v2);
-                    if (intersections.Contains(v1.Id) || intersections.Contains(v2.Id)) throw new InvalidOperationException("Something went wrong when adding a line.");
+                    if (intersections.Contains(v1) || intersections.Contains(v2)) throw new InvalidOperationException("Something went wrong when adding a line.");
                     result.AddRange(intersections);
                 }
             }
-            result.Add(verticesOnLine.Last().Id);
+            result.Add(verticesOnLine.Last());
             
             return result;
 
 
             // Connect vertices with an edge and add new vertices in case of intersections with existing edges.
             // Returns the list of intersection vertices.
-            List<VertexId> ConnectVertices(Vertex vertexA, Vertex vertexB)
+            List<VertexId> ConnectVertices(VertexId vertexA, VertexId vertexB)
             {
-                if (vertexA == vertexB) throw new InvalidOperationException("Tried to connect vertex with itself.");
+                if (vertexA.Equals(vertexB)) throw new InvalidOperationException("Tried to connect vertex with itself.");
                 
                 List<VertexId> intersectionVertices = new();
                 
                 var intersections = FindIntersections(vertexA, vertexB, nearbyEdges.ToList());
-                Vertex currentVertex = vertexA;
-                foreach (var intersection in intersections)
+                VertexId currentVertex = vertexA;
+                foreach (var (edge, intersectionPos)  in intersections)
                 {
-                    Vertex intersectionVertex = InsertOrGetVertexOnEdge(intersection.edge, intersection.intersectionPosition);
+                    VertexId v1 = edge.Item1;
+                    VertexId v2 = edge.Item2;
+                   
+                    VertexId intersectionVertex = InsertOrGetVertexOnEdge(v1, v2, intersectionPos);
                    
                     AddEdge(currentVertex, intersectionVertex);
                     currentVertex = intersectionVertex;
-                    intersectionVertices.Add(intersectionVertex.Id);
+                    intersectionVertices.Add(intersectionVertex);
                 }
                 AddEdge(currentVertex,vertexB);
                 return intersectionVertices;
             }
-         
- 
-
         }
 
 
-        public void DeleteEdge(VertexId a, VertexId b)
-        {
-            Vertex vertexA = _verticesById.GetValueOrDefault(a);
-            Vertex vertexB = _verticesById.GetValueOrDefault(b);
-            if (vertexA == null || vertexB == null) throw new ArgumentException("Vertex not found");
-            if (vertexA == vertexB) throw new ArgumentException("Same vertex when deleting edge");
-            
-            Edge edge = vertexA.EdgeConnectingTo(vertexB);
-            if (edge==null) throw new ArgumentException("Edge not found");
-
-            DeleteEdge(edge);
-        }
+        
         
         public void DeleteEdge(Vector2 a, Vector2 b)
         {
-            DeleteEdge( VertexAt(a), VertexAt(b) );
+           if (VertexAt(a) is not VertexId v1 || VertexAt(b) is not VertexId v2)
+                throw new ArgumentException("No vertex at one or both of the given positions while deleting edge.");
+            
+            DeleteEdgeBetween(v1, v2);
+            
+            VertexId? VertexAt(Vector2 position) => _edges.VerticesInCircle(position, Epsilon).FirstOrDefault();
         }
 
         /// <summary>
         /// Destroys the vertex and all edges connected to it.
         /// </summary>
         /// <exception cref="ArgumentException"></exception>
-        public void DeleteVertex(VertexId id)
+        public void DeleteVertex(VertexId vertex)
         {
-            Vertex vertex = _verticesById.GetValueOrDefault(id); 
-            if (vertex == null) throw new ArgumentException("Vertex not found");
-           
-            foreach (var edge in vertex.Edges.ToList())
+            foreach (var connected in _edges.ConnectedVertices(vertex).ToList())
             {
-                DeleteEdge(edge);
+                DeleteEdge(vertex, connected);
             }
-
-            _verticesById.Remove(id);
-            _vertices.Remove(vertex.Position, vertex);
-            Observers.OnDeleteVertex?.Invoke(id);
+            _edges.RemoveVertex(vertex);
+            Observers.OnDeleteVertex?.Invoke(vertex);
         }
         
-        internal void DeleteVertexWithoutCallingObservers(VertexId id) // Hack, remove
+        internal void DeleteVertexWithoutCallingObservers(VertexId vertex) // TODO: Hack, remove
         {
-            Vertex vertex = _verticesById.GetValueOrDefault(id); 
-            if (vertex == null) throw new ArgumentException("Vertex not found");
-           
-            foreach (var edge in vertex.Edges.ToList())
+            foreach (var connected in _edges.ConnectedVertices(vertex).ToList())
             {
-                edge.VertexA.Edges.Remove(edge);
-                edge.VertexB.Edges.Remove(edge);
-                _edges.Delete(edge);
+                _edges.RemoveEdge(vertex, connected);
             }
-
-            _verticesById.Remove(id);
-            _vertices.Remove(vertex.Position, vertex);
+            _edges.RemoveVertex(vertex);
         }
         
 
         public void DeleteVerticesWithoutEdges()
         {
-            var toBeDeleted = _verticesById.Values
-                .Where(v => v.Edges.Count == 0)
-                .Select(v => v.Id)
+            var toBeDeleted = _edges.Vertices()
+                .Where(v =>  !_edges.ConnectedVertices(v).Any())
                 .ToList();
 
             foreach (var id in toBeDeleted)
@@ -223,67 +165,7 @@ namespace RikusGameDevToolbox.Geometry2d
             }
         }
         
-        public Vector2 Position(VertexId vertexId)
-        {
-            Vertex vertex = _verticesById.GetValueOrDefault(vertexId);
-            if (vertex == null) throw new ArgumentException("Vertex not found");
-            return vertex.Position;
-        }
-        
-        public bool IsEdgeBetween(VertexId a, VertexId b)
-        {
-            Vertex vertexA = _verticesById.GetValueOrDefault(a);
-            Vertex vertexB = _verticesById.GetValueOrDefault(b);
-            if (vertexA == null || vertexB == null) throw new ArgumentException("Vertex not found");
-            return vertexA.EdgeConnectingTo(vertexB) != null;
-        }
-        
-        /// <summary>
-        /// Returns vertices that are connected with edge to the given vertex.
-        /// </summary>
-        /// <exception cref="ArgumentException">If vertex does not exist.</exception>
-        public IEnumerable<VertexId> EdgesOfVertex(VertexId vertexId)
-        {
-            Vertex vertex = _verticesById.GetValueOrDefault(vertexId);
-            if (vertex == null) throw new ArgumentException("Vertex not found");
-            return vertex.Connections.Select(v => v.Id);
-        }
-        
-        
-        /// <summary>
-        /// Return the vertex at given position or within distance epsilon of it. Returns null if no such vertex exists.
-        /// </summary>
-        public VertexId VertexAt(Vector2 position)
-        {
-            return _vertices.ItemsInCircle(position, Epsilon).FirstOrDefault()?.Id;
-        }
-        
-        /// <summary>
-        /// Vertices inside the rectangle
-        /// </summary>
-        public IEnumerable<VertexId> VerticesIn(Rect rectangle)
-        {
-            return _vertices.ItemsInRectangle(rectangle).Select(v => v.Id);
-        }
 
-        /// <summary>
-        /// Returns edges that are intersecting the rectangle or completely inside it.
-        /// </summary>
-        public IEnumerable<(VertexId, VertexId)> EdgesIn(Rect rectangle)
-        {
-            return EdgesIntersectingRect(rectangle).Select(edge => (edge.VertexA.Id, edge.VertexB.Id));
-        }
-
-        public virtual void TransformVertices(Func<Vector2, Vector2> transformFunction)
-        {
-            foreach (Vertex v in _verticesById.Values)
-            {
-                v.Position = transformFunction(v.Position);
-            }
-            
-            RebuildSpatialCollections();
-        }
-        
         /// <summary>
         /// Makes a deep copy of the planar graph.
         /// </summary>
@@ -291,38 +173,10 @@ namespace RikusGameDevToolbox.Geometry2d
         /// <param name="vertexIdFilter">Function that takes VertexId as parameter that returns true if the vertex is to be copied. </param>
         public PlanarGraph MakeDeepCopy(bool preserveVertexIds = true, Func<VertexId, bool> vertexIdFilter = null)
         {
-            if (vertexIdFilter == null) vertexIdFilter = _ => true;
-            
-            var copy = new PlanarGraph(Epsilon);
-            
-            Dictionary<Vertex, Vertex> vertexLookup = new Dictionary<Vertex, Vertex>();
-            
-            foreach (var vertex in _verticesById.Values)
+            return new PlanarGraph(Epsilon)
             {
-                if (!vertexIdFilter(vertex.Id)) continue;
-                Vertex newVertex = new()
-                {
-                    Id = preserveVertexIds ? vertex.Id : VertexId.New(),
-                    Position = vertex.Position
-                };
-                vertexLookup[vertex] = newVertex;
-                copy._vertices.Add(newVertex.Position, newVertex);
-                copy._verticesById[newVertex.Id] = newVertex;
-            } 
-
-            foreach (var edge in _edges.All() )
-            {
-                if (!vertexIdFilter(edge.VertexA.Id) || !vertexIdFilter(edge.VertexB.Id)) continue;
-                
-                Edge newEdge = new Edge(vertexLookup[edge.VertexA], vertexLookup[edge.VertexB]);
-                newEdge.VertexA.Edges.Add(newEdge);
-                newEdge.VertexB.Edges.Add(newEdge);
-                copy._edges.Insert(newEdge);
-            }
-
-            return copy;
-
-   
+                _edges = _edges.MakeCopy(preserveVertexIds, vertexIdFilter) as EdgesSpatial
+            };
         }
       
         
@@ -331,145 +185,91 @@ namespace RikusGameDevToolbox.Geometry2d
 
         #region ------------------------------------------ PRIVATE METHODS ----------------------------------------------
 
-        private Vertex GetOrAddVertex(Vector2 position)
+        private VertexId GetOrAddVertex(Vector2 position)
         {
-            if (ContainsNan(position)) throw new ArgumentException("Tried to add vertex with NaN position");
-            
-            var existingVertex = _vertices.ItemsInCircle(position, Epsilon).FirstOrDefault();
-            if (existingVertex != null) return existingVertex;
+            var existing = _edges.VerticesInCircle(position, Epsilon);
+            if (existing.Any()) return existing.First();
 
 
             var edges = EdgesWithinEpsilon(position);
-           if (edges.Any())
-           {
-               var insertedVertex = InsertOrGetVertexOnEdge(edges.First(), position);
-               edges.RemoveAt(0);
-               foreach (var edge in edges)
-               {
-                   DeleteEdge(edge);
-                   AddEdge(edge.VertexA, insertedVertex);
-                   AddEdge(edge.VertexB, insertedVertex);
-               }
-
-               return insertedVertex;
-           }
-
-            var newVertex = new Vertex
+            if (edges.Any())
             {
-                Id = VertexId.New(),
-                Position = position
-            };
-            _vertices.Add(newVertex.Position, newVertex);
-            _verticesById[newVertex.Id] = newVertex;
-            Observers.OnAddVertex?.Invoke(newVertex.Id);
+                var insertedVertex = InsertOrGetVertexOnEdge(edges.First().v1, edges.First().v2, position);
+                edges.RemoveAt(0);
+                foreach (var edge in edges)
+                {
+                    if (insertedVertex.Equals(edge.v1) || insertedVertex.Equals(edge.v2)) continue;
+                    DeleteEdge(edge.v1, edge.v2);
+                    AddEdge(edge.v1, insertedVertex);
+                    AddEdge(edge.v2, insertedVertex);
+                }
+                return insertedVertex;
+            }
+
+            var newVertex = _edges.AddVertex(position);
+            Observers.OnAddVertex?.Invoke(newVertex);
             return newVertex;
-          
         }
 
      
-        private void AddEdge(Vertex vertexA, Vertex vertexB)
+        private void AddEdge(VertexId vertexA, VertexId vertexB)
         {
-            if (vertexA == vertexB) return;
-            if (vertexA.EdgeConnectingTo(vertexB) != null) return; // Edge already exists
-            
-            Edge edge = new Edge(vertexA, vertexB);
-            vertexA.Edges.Add(edge);
-            vertexB.Edges.Add(edge);
-            
-            _edges.Insert(edge);
-
-            Observers.OnAddEdge?.Invoke(vertexA.Id, vertexB.Id);
+            _edges.AddEdge(vertexA, vertexB);
+            Observers.OnAddEdge?.Invoke(vertexA, vertexB);
         }
         
-        private void DeleteEdge(Edge edge)
+        private void DeleteEdgeBetween(VertexId v1, VertexId v2)
         {
-            edge.VertexA.Edges.Remove(edge);
-            edge.VertexB.Edges.Remove(edge);
-            _edges.Delete(edge);
-            
-            Observers.OnDeleteEdge?.Invoke(edge.VertexA.Id, edge.VertexB.Id);
+            _edges.RemoveEdge(v1, v2);
+            Observers.OnDeleteEdge?.Invoke(v1, v2);
         }
 
-        private Vertex InsertOrGetVertexOnEdge(Edge edge, Vector2 position)
+        private VertexId InsertOrGetVertexOnEdge(VertexId v1, VertexId v2, Vector2 position)
         {
-            if (edge.VertexA == edge.VertexB)throw new ArgumentException("Tried to insert vertex on edge with same vertices");
-            float distance = Vector2.Distance(edge.VertexA.Position, edge.VertexB.Position);
-            var oldEdge = edge;
+            if (v1.Equals(v2)) throw new ArgumentException("Tried to insert vertex on edge with same vertices");
+          
+            var oldEdge = (v1, v2);
             // Set the position exactly on the edge:
-            var correctedPosition = GeometryUtils.ProjectPointOnEdge(position, oldEdge.VertexA.Position, oldEdge.VertexB.Position);
+            var correctedPosition = GeometryUtils.ProjectPointOnEdge(position, _edges.Position(v1), _edges.Position(v2));
 
-            var existing = _vertices.ItemsInCircle(correctedPosition, Epsilon).FirstOrDefault();
-            if (existing != null)
+            var existing = _edges.VerticesInCircle(correctedPosition, Epsilon);
+            if (existing.Any())
             {
-                if (existing == edge.VertexA || existing == edge.VertexB)
+                if (existing.First().Equals(v1) || existing.First().Equals(v2))
                 {
                     // If the vertex is already one of the edge vertices, return it.
-                    return existing;
+                    return existing.First();
                 }
                 throw new InvalidOperationException("Vertex already exists at the position: " + correctedPosition);
             }
 
-            
-            var newVertex = new Vertex
-            {
-                Id = VertexId.New(),
-                Position = correctedPosition
-            };
-            
-            _vertices.Add(newVertex.Position, newVertex);
-            _verticesById[newVertex.Id] = newVertex;
 
-            oldEdge.VertexA.Edges.Remove(oldEdge);
-            oldEdge.VertexB.Edges.Remove(oldEdge);
-            if (!_edges.Delete(oldEdge))
-            {
-                throw new InvalidOperationException("Failed to delete edge from spatial index.");
-            }
-        
-
-            // First new edge
-            Edge edge1 = new Edge(oldEdge.VertexA, newVertex);
-            edge1.VertexA.Edges.Add(edge1);
-            edge1.VertexB.Edges.Add(edge1);
-            _edges.Insert(edge1);
-           
-            // Second new edge
-            Edge edge2 = new Edge(newVertex, oldEdge.VertexB);
-            edge2.VertexA.Edges.Add(edge2);
-            edge2.VertexB.Edges.Add(edge2);
-            _edges.Insert(edge2);
+            var newVertex = _edges.AddVertex(correctedPosition);
+       
+            _edges.RemoveEdge(v1,v2);
+            _edges.AddEdge(v1, newVertex);
+            _edges.AddEdge(newVertex, v2);
             
-            Observers.OnSplitEdge?.Invoke(oldEdge.VertexA.Id, oldEdge.VertexB.Id, newVertex.Id);
+            Observers.OnSplitEdge?.Invoke(v1, v2, newVertex);
             
             return newVertex;
         }
 
-        /// <summary>
-        /// Returns edges that are intersecting the rectangle or contained wholly in it.
-        /// </summary>
-        private IEnumerable<Edge> EdgesIntersectingRect(Rect rectangle)
-        {
-            Envelope searchArea = new Envelope(rectangle.xMin, rectangle.yMin, rectangle.xMax, rectangle.yMax);
-            return _edges.Search(searchArea).Where( edge => IsEdgeIntersectingRect(edge, rectangle));
-            
-            bool IsEdgeIntersectingRect(Edge edge, Rect rect)
-            {
-                return Intersection.LineSegmentRectangle(edge.VertexA.Position, edge.VertexB.Position, rect);
-            }
-        }
         
         /// <summary>
         /// Return the vertices that are within epsilon of the line. The vertices are given in order
         /// and include the start and the end. 
         /// </summary>
-        private List<Vertex> VerticesOnLine(Vertex start, Vertex end)
+        private List<VertexId> VerticesOnLine(VertexId start, VertexId end)
         {
             Rect searchArea = RectAroundEdge(start, end);
+            Vector2 startPos = _edges.Position(start);
+            Vector2 endPos = _edges.Position(end);
 
-            var result = _vertices.ItemsInRectangle(searchArea)
-                .Where(vertex => vertex != start && vertex != end &&
-                                 GeometryUtils.IsPointOnEdge(vertex.Position, start.Position, end.Position, Epsilon))
-                .OrderBy(v => Vector2.Distance(start.Position, v.Position))
+            var result = _edges.VerticesIn(searchArea)
+                .Where(vertex => !vertex.Equals(start) && !vertex.Equals(end) &&
+                                 GeometryUtils.IsPointOnEdge(_edges.Position(vertex), startPos, endPos, Epsilon))
+                .OrderBy(v => Vector2.Distance(startPos, _edges.Position(v)))
                 .ToList();
 
             result.Insert(0, start);
@@ -478,74 +278,54 @@ namespace RikusGameDevToolbox.Geometry2d
             return result;
         }
 
-        private List<Edge> EdgesWithinEpsilon(Vector2 position)
+        private List<(VertexId v1, VertexId v2)> EdgesWithinEpsilon(Vector2 position)
         {
             // Rect with side length of 2 * _epsilon with given position as center:
             var smallRect = new Rect(position.x - Epsilon, position.y - Epsilon, Epsilon*2f, Epsilon*2f);
             
-            return EdgesIntersectingRect(smallRect)
-                .Where(edge => GeometryUtils.IsPointOnEdge(position,edge.VertexA.Position,edge.VertexB.Position, Epsilon))
+            return _edges.EdgesIn(smallRect)
+                .Where(edge => GeometryUtils.IsPointOnEdge(position,_edges.Position(edge.Item1),_edges.Position(edge.Item2), Epsilon))
                 .ToList();
-
-        }
+       }
     
         /// <summary>
         /// Returns list of intersections between the line segment v1-v2 and the given edges.
         /// </summary>
         /// <returns>List of intersecting edges and intersection positions.
         /// Intersections are ordered by distance from v1 with the closest first.</returns>
-        private List<(Edge edge, Vector2 intersectionPosition)> FindIntersections(Vertex v1, Vertex v2, List<Edge> edges)
+        private List<((VertexId, VertexId), Vector2 intersectionPosition)> FindIntersections(VertexId v1, VertexId v2, List<(VertexId, VertexId)> edges)
         {
-            var result = new List<(Edge, Vector2 intersectionPos)>();
+            var result = new List<((VertexId, VertexId), Vector2 intersectionPos)>();
 
             foreach (var edge in edges)
             {
-                if (edge.VertexA == v1 || edge.VertexA == v2) continue;
-                if (edge.VertexB == v1 || edge.VertexB == v2) continue;
+                if (edge.Item1.Equals(v1) || edge.Item1.Equals(v2)) continue;
+                if (edge.Item2.Equals(v1) || edge.Item2.Equals(v2)) continue;
 
-                Vector2? intersection = Intersection.LineSegmentPosition(v1.Position, v2.Position,
-                    edge.VertexA.Position, edge.VertexB.Position);
+                Vector2? intersection = Intersection.LineSegmentPosition(_edges.Position(v1), _edges.Position(v2),
+                    _edges.Position(edge.Item1), _edges.Position(edge.Item2));
                 if (intersection == null) continue;
 
                 var intersectionPoint = intersection.Value;
                 result.Add((edge, intersectionPoint));
             }
 
-            return result.OrderBy(i => Vector2.Distance(v1.Position, i.intersectionPos)).ToList();
+            return result.OrderBy(i => Vector2.Distance(_edges.Position(v1), i.intersectionPos)).ToList();
         }
 
      
       
-        
-        private Rect RectAroundEdge(Vertex va, Vertex vb)
+        /// <summary>
+        ///  Rectangle that encapsulates the edge between the two vertices with surrounding margin the width of epsilon.
+        /// </summary>
+        private Rect RectAroundEdge(VertexId va, VertexId vb)
         {
-            var rect = RectExtensions.CreateRectToEncapsulate(va.Position, vb.Position);
+            var rect = RectExtensions.CreateRectToEncapsulate(_edges.Position(va), _edges.Position(vb));
             rect = rect.Grow(2f*Epsilon);
             return rect;
         }
         
-        /// <summary>
-        /// Rebuilds the spatial collections. This is needed after the vertices have been moved.
-        /// </summary>
-        private void RebuildSpatialCollections()
-        {
-            _vertices.Clear();
-            foreach (Vertex v in _verticesById.Values)
-            {
-                _vertices.Add(v.Position, v);
-            }
-            
-            var edges = _edges.All();
-            _edges.Clear();
-            foreach (Edge edge in edges)
-            {
-                edge.UpdateEnvelope();
-                _edges.Insert(edge);
-            }
-         
-        }
-      
-        private bool ContainsNan(Vector2 v) => float.IsNaN(v.x) || float.IsNaN(v.y);
+
         
         #endregion
     }

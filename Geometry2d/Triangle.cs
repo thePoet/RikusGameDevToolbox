@@ -10,7 +10,7 @@ namespace RikusGameDevToolbox.Geometry2d
         public Vector2 Vertex3 { get; }
 
         public Vector2[] Vertices => new[] { Vertex1, Vertex2, Vertex3 };
-        public Edge[] Edges => new[] { new Edge(Vertex1, Vertex2), new Edge(Vertex2, Vertex3), new Edge(Vertex3, Vertex1) };
+        public DelaunayEdge[] Edges => new[] { new DelaunayEdge(Vertex1, Vertex2), new DelaunayEdge(Vertex2, Vertex3), new DelaunayEdge(Vertex3, Vertex1) };
         public Vector2 Centroid => (Vertex1 + Vertex2 + Vertex3) / 3f;
         public Vector2 Circumcenter => CalculateCircumcenter();
 

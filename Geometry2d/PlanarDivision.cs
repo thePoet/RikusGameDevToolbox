@@ -42,8 +42,8 @@ namespace RikusGameDevToolbox.Geometry2d
         public SimplePolygon FaceContour(FaceId faceId) => new SimplePolygon(FaceVertexPositions(_faces[faceId].HalfEdge));
         public Polygon FacePolygon(FaceId faceId) => FaceAsPolygon(_faces[faceId]);
         public int NumFaces => _faces.Values.Count;
-        public int NumEdges => PlanarGraph.Edges.Count;
-        public int NumVertices => PlanarGraph.Vertices.Count;
+        public int NumEdges => PlanarGraph.NumEdges;
+        public int NumVertices => PlanarGraph.NumVertices;
         public IEnumerable<Vector2> Vertices => PlanarGraph.Vertices.Select(v => PlanarGraph.Position(v));
         public IEnumerable<(Vector2, Vector2)> Edges => PlanarGraph.Edges
             .Select(edge => (PlanarGraph.Position(edge.Item1), PlanarGraph.Position(edge.Item2)));
@@ -95,7 +95,7 @@ namespace RikusGameDevToolbox.Geometry2d
             {
                 throw new ArgumentException("No vertex at given position.");
             }
-            return FaceLeftOfEdge(v1,v2);
+            return FaceLeftOfEdge(v1.Value, v2.Value);
         }
 
         /// <summary>
@@ -161,7 +161,7 @@ namespace RikusGameDevToolbox.Geometry2d
         {
             var id = PlanarGraph.VertexAt(position);
             if (id == null) return false;
-            PlanarGraph.DeleteVertex(id);
+            PlanarGraph.DeleteVertex(id.Value);
             return true;
         }
         /*
@@ -220,7 +220,7 @@ namespace RikusGameDevToolbox.Geometry2d
 
         internal void OnAddEdge(VertexId v1, VertexId v2)
         {
-            if (v1==v2) Debug.LogWarning("Tried to add edge with same vertices: " + v1 + " and " + v2);
+            if (v1.Equals(v2)) Debug.LogWarning("Tried to add edge with same vertices: " + v1 + " and " + v2);
             var (halfEdge1, halfEdge2) = AddHalfEdgePairBetweenVertices(v1, v2);
             UpdateFacesAfterAddingHalfEdgePair(halfEdge1);
         }
@@ -285,7 +285,7 @@ namespace RikusGameDevToolbox.Geometry2d
                 Vector2 direction = PlanarGraph.Position(target) - PlanarGraph.Position(origin);
           
                 var edge = EdgesOriginatingFrom(origin)
-                    .Where(he => he.Target != target) // Exclude self
+                    .Where(he => !he.Target.Equals(target)) // Exclude self
                     .OrderBy(he => direction.AngleCounterClockwise(PlanarGraph.Position(he.Target) - PlanarGraph.Position(he.Origin))) // CCW order
                     .FirstOrDefault();
 
@@ -583,7 +583,7 @@ namespace RikusGameDevToolbox.Geometry2d
 
         private HalfEdge GetHalfEdge(VertexId origin, VertexId target)
         {
-            return EdgesOriginatingFrom(origin).FirstOrDefault(he => he.Target == target);
+            return EdgesOriginatingFrom(origin).FirstOrDefault(he => he.Target.Equals(target) );
         }
 
 

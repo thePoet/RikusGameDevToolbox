@@ -28,16 +28,16 @@ namespace RikusGameDevToolbox.Tests
 
             var middleVertex = pg.VertexAt(new(5f, 5f));
             Assert.IsTrue( middleVertex != null );
-            Assert.IsTrue( IsSame(pg.Position(middleVertex), new(5f, 5f)) );
+            Assert.IsTrue( IsSame(pg.Position(middleVertex.Value), new(5f, 5f)) );
 
-            Assert.IsTrue( pg.EdgesOfVertex(middleVertex).Count()==4);
+            Assert.IsTrue( pg.ConnectedVertices(middleVertex.Value).Count()==4);
             var corner = pg.VertexAt(new(10f,10f));
-            Assert.IsTrue( pg.EdgesOfVertex(corner).Count()==3);
+            Assert.IsTrue( pg.ConnectedVertices(corner.Value).Count()==3);
             var oppositeCorner = pg.VertexAt(new(0f,0f));
 
             
-            Assert.IsTrue( pg.IsEdgeBetween(middleVertex, corner) );
-            Assert.IsFalse( pg.IsEdgeBetween(oppositeCorner, corner) );
+            Assert.IsTrue( pg.IsEdgeBetween(middleVertex.Value, corner.Value) );
+            Assert.IsFalse( pg.IsEdgeBetween(oppositeCorner.Value, corner.Value) );
         }
 
         [Test]
@@ -50,7 +50,7 @@ namespace RikusGameDevToolbox.Tests
             Assert.IsTrue( pg.NumVertices == 6 );
             Assert.IsTrue( pg.NumEdges == 7 );
             var v = pg.VertexAt(new Vector2(10f, 5f));
-            Assert.IsTrue(pg.EdgesOfVertex(v).Count()==3);
+            Assert.IsTrue(pg.ConnectedVertices(v.Value).Count()==3);
 
         }
 
@@ -84,13 +84,13 @@ namespace RikusGameDevToolbox.Tests
             Assert.IsTrue( IsSame( pg.Position(result[2]), h ));
             Assert.IsTrue( IsSame( pg.Position(result[3]), f ));
             
-            Assert.IsTrue( pg.IsEdgeBetween(pg.VertexAt(e), pg.VertexAt(g)) );
-            Assert.IsTrue( pg.IsEdgeBetween(pg.VertexAt(g), pg.VertexAt(h)) );
-            Assert.IsTrue( pg.IsEdgeBetween(pg.VertexAt(h), pg.VertexAt(f)) );
-            Assert.IsTrue( pg.IsEdgeBetween(pg.VertexAt(a), pg.VertexAt(g)) );
-            Assert.IsTrue( pg.IsEdgeBetween(pg.VertexAt(g), pg.VertexAt(b)) );
-            Assert.IsTrue( pg.IsEdgeBetween(pg.VertexAt(c), pg.VertexAt(h)) );
-            Assert.IsTrue( pg.IsEdgeBetween(pg.VertexAt(h), pg.VertexAt(d)) );
+            Assert.IsTrue( pg.IsEdgeBetween(pg.VertexAt(e).Value, pg.VertexAt(g).Value) );
+            Assert.IsTrue( pg.IsEdgeBetween(pg.VertexAt(g).Value, pg.VertexAt(h).Value) );
+            Assert.IsTrue( pg.IsEdgeBetween(pg.VertexAt(h).Value, pg.VertexAt(f).Value) );
+            Assert.IsTrue( pg.IsEdgeBetween(pg.VertexAt(a).Value, pg.VertexAt(g).Value) );
+            Assert.IsTrue( pg.IsEdgeBetween(pg.VertexAt(g).Value, pg.VertexAt(b).Value) );
+            Assert.IsTrue( pg.IsEdgeBetween(pg.VertexAt(c).Value, pg.VertexAt(h).Value) );
+            Assert.IsTrue( pg.IsEdgeBetween(pg.VertexAt(h).Value, pg.VertexAt(d).Value) );
 
         }
 
@@ -145,20 +145,20 @@ namespace RikusGameDevToolbox.Tests
             Assert.IsTrue( pg.NumEdges == 8 );
             
             
-            pg.DeleteEdge( pg.VertexAt(new Vector2(0f,0f)), 
-                           pg.VertexAt(new Vector2(10f,0f)) );
+            pg.DeleteEdge( pg.VertexAt(new Vector2(0f,0f)).Value, 
+                           pg.VertexAt(new Vector2(10f,0f)).Value );
 
             Assert.IsTrue( pg.NumVertices == 5 );
             Assert.IsTrue( pg.NumEdges == 7 );
             
-            pg.DeleteEdge( pg.VertexAt(new Vector2(5f,5f)), 
-                pg.VertexAt(new Vector2(10f,0f)) );
+            pg.DeleteEdge( pg.VertexAt(new Vector2(5f,5f)).Value, 
+                pg.VertexAt(new Vector2(10f,0f)).Value );
             
             Assert.IsTrue( pg.NumVertices == 5 );
             Assert.IsTrue( pg.NumEdges == 6 );
             
-            pg.DeleteEdge( pg.VertexAt(new Vector2(10f,10f)), 
-                pg.VertexAt(new Vector2(10f,0f)) );
+            pg.DeleteEdge( pg.VertexAt(new Vector2(10f,10f)).Value, 
+                pg.VertexAt(new Vector2(10f,0f)).Value );
             
             Assert.IsTrue( pg.NumVertices == 5 );
             Assert.IsTrue( pg.NumEdges == 5 );
@@ -177,7 +177,7 @@ namespace RikusGameDevToolbox.Tests
             Assert.IsTrue(pg.NumVertices == 5);
             Assert.IsTrue(pg.NumEdges == 8);
             
-            pg.DeleteVertex( pg.VertexAt(new Vector2(5f, 5f)) );
+            pg.DeleteVertex( pg.VertexAt(new Vector2(5f, 5f)).Value );
             
             Assert.IsTrue( pg.NumVertices == 4 );
             Assert.IsTrue( pg.NumEdges == 4 );
