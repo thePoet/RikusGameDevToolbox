@@ -26,5 +26,10 @@ namespace RikusGameDevToolbox.Geometry2d
         {
             return Value.GetHashCode();
         }
+        
+        public static bool operator == (VertexId a, VertexId b) =>  a.Equals(b);
+        public static bool operator != (VertexId a, VertexId b) =>  !a.Equals(b);
+
+
     }
 }

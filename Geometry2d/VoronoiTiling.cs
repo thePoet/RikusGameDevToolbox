@@ -14,29 +14,23 @@ namespace RikusGameDevToolbox.Geometry2d
         private static Vector2 AsVector2(this VoronoiPoint point) => new Vector2((float)point.X, (float)point.Y);
 
 
-        public static PlanarDivision Create(IEnumerable<Vector2> points, Rect size, int relaxIterations=0)
+        public static PlanarDivision Create(IEnumerable<Vector2> points, Rect size, int relaxIterations = 0)
         {
             List<VoronoiEdge> edges = CreateVoronoiEdges(points, size, relaxIterations);
             return DivisionFromVoronoiEdges(edges);
         }   
         
-        public static PlanarDivision CreateInPolygon(Polygon polygon, IEnumerable<Vector2> points,  int relaxIterations=0)
+        public static PlanarDivision CreateInPolygon(Polygon polygon, IEnumerable<Vector2> points,  int relaxIterations = 0)
         {
             List<VoronoiEdge> edges = CreateVoronoiEdges(points, polygon.Bounds(), relaxIterations);
             return DivisionFromVoronoiEdges(edges, polygon);
         }
-        public static PlanarGraph AsPlanarGraph(Polygon polygon, IEnumerable<Vector2> points,  int relaxIterations=0)
+        public static PlanarGraph AsPlanarGraph(Polygon polygon, IEnumerable<Vector2> points,  int relaxIterations = 0)
         {
             List<VoronoiEdge> edges = CreateVoronoiEdges(points, polygon.Bounds(), relaxIterations);
             return PlanarGraphFromVoronoiEdges(edges, polygon);
         }
-
-        public static PolygonMesh CreatePolygonMesh(IEnumerable<Vector2> points, Rect size, float minEdgeLength)
-        {
-            List<VoronoiEdge> edges = CreateVoronoiEdges(points, size, 0);
-            return PolygonMeshFromEdges(edges, minEdgeLength);
-        }
-
+ 
         private static List<VoronoiEdge> CreateVoronoiEdges(IEnumerable<Vector2> points, Rect size, int relaxIterations)
         {
             VoronoiPlane voronoi = new VoronoiPlane(size.min.x, size.min.y, size.max.x, size.max.y);
@@ -125,59 +119,6 @@ namespace RikusGameDevToolbox.Geometry2d
         }
 
         
-        /// <summary>
-        /// Generates a PolygonMesh from list of VoronoiEdges produced with SharpVoronoiLib
-        /// </summary>
-        private static PolygonMesh PolygonMeshFromEdges(List<VoronoiEdge> edges, float minEdgeLength)
-        {
-            Dictionary<VoronoiSite, SimplePolygon> polygons = new();
-         //   List<(VoronoiSite, VoronoiSite)> neighbours = new();
-            
-            foreach (var edge in edges)
-            {
-                AddSite(edge.Left);
-                AddSite(edge.Right);
-                if (edge.Left == null || edge.Right == null) continue;
-           //     neighbours.Add((edge.Left, edge.Right));
-            }
-
-            var mesh = new PolygonMesh();
-            foreach (SimplePolygon polygon in polygons.Values)
-            {
-                try
-                {
-                    mesh.AddPolygon(polygon);
-                }
-                catch (Exception e)
-                {
-                    Console.WriteLine(e);
-                }
-            }
-/*
-            foreach (var (siteA, siteB) in neighbours)
-            {
-                mesh.MarkAsNeighbours(polygons[siteA], polygons[siteB]);
-            }*/
-
-            mesh.FuseVertices(minEdgeLength);
-            
-            return mesh;
-
-            void AddSite(VoronoiSite site)
-            {
-                if (site==null || polygons.ContainsKey(site)) return;
-                polygons.Add(site, ConvertToPolygon(site));
-            }
-
-            SimplePolygon ConvertToPolygon(VoronoiSite site)
-            {
-                List<Vector2> vertices = site.ClockwisePoints.Select( p => p.AsVector2() ).Reverse().ToList();
-                return new SimplePolygon(vertices);
-            //    var vertices = site.Points.Select( p => p.AsVector2() );
-              //  return PolygonTools.CreateFromUnorderedPoints(vertices);
-            }
-            
-        }
        
     }
 }

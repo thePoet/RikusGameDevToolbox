@@ -260,7 +260,7 @@ namespace RikusGameDevToolbox.Geometry2d
             for (int i=1; i < contours.Count; i++)
             {
                 var faces = FacesInsideContour(contours[i]);
-                result.Add(SplitFaces(contours[i], faces));
+                result.Add(DetachFaces(contours[i], faces));
             }
 
             return result;
@@ -275,7 +275,7 @@ namespace RikusGameDevToolbox.Geometry2d
                return pathFinding.GetAllNodesConnectedTo(faceInside.Id).ToHashSet();
             }
             
-            PlanarDivision<T> SplitFaces(OutsideFace contour, HashSet<FaceId> faces)
+            PlanarDivision<T> DetachFaces(OutsideFace contour, HashSet<FaceId> faces)
             {
                 PlanarDivision<T> result = new PlanarDivision<T>(PlanarGraph.Epsilon);
                 result.ValuelessFacesAreEmpty = ValuelessFacesAreEmpty;

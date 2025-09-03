@@ -201,7 +201,7 @@ namespace RikusGameDevToolbox.Geometry2d
                     if (insertedVertex.Equals(edge.v1) || insertedVertex.Equals(edge.v2)) continue;
                     DeleteEdge(edge.v1, edge.v2);
                     AddEdge(edge.v1, insertedVertex);
-                    AddEdge(edge.v2, insertedVertex);
+                    AddEdge(edge.v2, insertedVertex); //!!!!
                 }
                 return insertedVertex;
             }

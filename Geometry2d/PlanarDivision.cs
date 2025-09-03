@@ -363,9 +363,7 @@ namespace RikusGameDevToolbox.Geometry2d
                     return;
                 }
 
-               // DebugLine = PathPositions(path1.HalfEdge);
-
-                throw new Exception("Something went wrong when ");
+                throw new Exception("Something went wrong when updating faces.");
             }
             
             
