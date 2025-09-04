@@ -141,7 +141,7 @@ namespace RikusGameDevToolbox.Geometry2d
             {
                 foreach ((Vector2 p1, Vector2 p2) in polygon.Edges(pathIndex))
                 {
-                    var verticesOnEdge = PlanarGraph.AddLine(p1, p2, OnAddVertex, OnAddEdge, OnSplitEdge, OnDeleteEdge);
+                    var verticesOnEdge = PlanarGraph.AddLine(p1, p2, OnAddVertex, OnAddEdge, OnSplitEdge);
                     verticesOnEdges.UnionWith(verticesOnEdge);
                     if (pathIndex == 0)
                     {
@@ -195,7 +195,7 @@ namespace RikusGameDevToolbox.Geometry2d
         {
             _setDefaultValueForNewFaces = true;
             _defaultValue = value; 
-            PlanarGraph.AddLine(p1, p2, OnAddVertex, OnAddEdge, OnSplitEdge, OnDeleteEdge);
+            PlanarGraph.AddLine(p1, p2, OnAddVertex, OnAddEdge, OnSplitEdge);
             _setDefaultValueForNewFaces = false;
         }
         

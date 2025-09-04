@@ -51,11 +51,11 @@ namespace RikusGameDevToolbox.Geometry2d
         public List<VertexId> AddLine(Vector2 a, Vector2 b, 
             Action<VertexId>                      onAddVertex  = null, 
             Action<VertexId, VertexId>            onAddEdge    = null, 
-            Action<VertexId, VertexId, VertexId>  onSplitEdge  = null, 
-            Action<VertexId, VertexId>            onDeleteEdge = null) // TODO: would be nice to get rid of this, see GetOrAddVertex
+            Action<VertexId, VertexId, VertexId>  onSplitEdge  = null) 
+           // Action<VertexId, VertexId>            onDeleteEdge = null) // TODO: would be nice to get rid of this, see GetOrAddVertex
         {
-            VertexId va = GetOrAddVertex(a, onAddVertex, onAddEdge, onSplitEdge, onDeleteEdge);
-            VertexId vb = GetOrAddVertex(b, onAddVertex, onAddEdge, onSplitEdge, onDeleteEdge);
+            VertexId va = GetOrAddVertex(a, onAddVertex, onSplitEdge);
+            VertexId vb = GetOrAddVertex(b, onAddVertex, onSplitEdge);
 
             if (va.Equals(vb)) return new List<VertexId>{va};
 
@@ -188,7 +188,7 @@ namespace RikusGameDevToolbox.Geometry2d
 
         #region ------------------------------------------ PRIVATE METHODS ----------------------------------------------
 
-        private VertexId GetOrAddVertex(Vector2 position, Action<VertexId> onAddVertex, Action<VertexId, VertexId> onAddEdge, Action<VertexId, VertexId, VertexId> onSplitEdge, Action<VertexId, VertexId> onDeleteEdge)
+        private VertexId GetOrAddVertex(Vector2 position, Action<VertexId> onAddVertex, Action<VertexId, VertexId, VertexId> onSplitEdge)
         {
             var existing = _edges.VerticesInCircle(position, Epsilon);
             if (existing.Any()) return existing.First();
@@ -199,6 +199,9 @@ namespace RikusGameDevToolbox.Geometry2d
             {
                 var insertedVertex = InsertOrGetVertexOnEdge(edges.First().v1, edges.First().v2, position, onSplitEdge);
       
+                // Following code cause trouble in PlanarDivision, so I disabled it. This however means that we may have vertices 
+                // closer to edges than epsilon, which may or may not be a problem.
+                /*
                 foreach (var edge in edges.Skip(1))
                 {
                     if (insertedVertex.Equals(edge.v1) || insertedVertex.Equals(edge.v2)) continue;
@@ -217,7 +220,7 @@ namespace RikusGameDevToolbox.Geometry2d
                         _edges.AddEdge(edge.v2, insertedVertex);
                         onAddEdge?.Invoke(edge.v2, insertedVertex);
                     }
-                }
+                }*/
                 return insertedVertex;
             }
 

@@ -63,7 +63,7 @@ namespace RikusGameDevToolbox.Geometry2d
         
         public List<Vector2> AddLine(Vector2 v1, Vector2 v2)
         {
-            return PlanarGraph.AddLine(v1, v2, OnAddVertex, OnAddEdge, OnSplitEdge, OnDeleteEdge)
+            return PlanarGraph.AddLine(v1, v2, OnAddVertex, OnAddEdge, OnSplitEdge)
                 .Select(id => PlanarGraph.Position(id)).ToList();
         }
 
