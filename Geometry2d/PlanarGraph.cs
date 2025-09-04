@@ -89,6 +89,27 @@ namespace RikusGameDevToolbox.Geometry2d
             
             return result;
 
+            
+      
+            // Return the vertices that are within epsilon of the line. The vertices are given in order
+            // and include the start and the end. 
+            List<VertexId> VerticesOnLine(VertexId start, VertexId end)
+            {
+                Rect searchArea = RectAroundEdge(start, end);
+                Vector2 startPos = _edges.Position(start);
+                Vector2 endPos = _edges.Position(end);
+
+                var result = _edges.VerticesIn(searchArea)
+                    .Where(vertex => !vertex.Equals(start) && !vertex.Equals(end) &&
+                                     GeometryUtils.IsPointOnEdge(_edges.Position(vertex), startPos, endPos, Epsilon))
+                    .OrderBy(v => Vector2.Distance(startPos, _edges.Position(v)))
+                    .ToList();
+
+                result.Insert(0, start);
+                result.Add(end);
+
+                return result;
+            }
 
             // Connect vertices with an edge and add new vertices in case of intersections with existing edges.
             // Returns the list of intersection vertices.
@@ -195,13 +216,15 @@ namespace RikusGameDevToolbox.Geometry2d
             if (edges.Any())
             {
                 var insertedVertex = InsertOrGetVertexOnEdge(edges.First().v1, edges.First().v2, position);
-                edges.RemoveAt(0);
-                foreach (var edge in edges)
+      
+                foreach (var edge in edges.Skip(1))
                 {
                     if (insertedVertex.Equals(edge.v1) || insertedVertex.Equals(edge.v2)) continue;
+                    
+                    // This may cause some trouble in PlanarDivision because we delete and add instead of splitting the edge.
                     DeleteEdge(edge.v1, edge.v2);
-                    AddEdge(edge.v1, insertedVertex);
-                    AddEdge(edge.v2, insertedVertex); //!!!!
+                    if (!IsEdgeBetween(edge.v1, insertedVertex)) AddEdge(edge.v1, insertedVertex);
+                    if (!IsEdgeBetween(edge.v2, insertedVertex)) AddEdge(edge.v2, insertedVertex);
                 }
                 return insertedVertex;
             }
@@ -227,12 +250,12 @@ namespace RikusGameDevToolbox.Geometry2d
         private VertexId InsertOrGetVertexOnEdge(VertexId v1, VertexId v2, Vector2 position)
         {
             if (v1.Equals(v2)) throw new ArgumentException("Tried to insert vertex on edge with same vertices");
-          
-            var oldEdge = (v1, v2);
-            // Set the position exactly on the edge:
-            var correctedPosition = GeometryUtils.ProjectPointOnEdge(position, _edges.Position(v1), _edges.Position(v2));
+            
+        
+            var positionExactlyOnEdge = GeometryUtils.ProjectPointOnEdge(position, _edges.Position(v1), _edges.Position(v2));
 
-            var existing = _edges.VerticesInCircle(correctedPosition, Epsilon);
+            // If the position is close to one of the edge vertices, return that vertex.
+            var existing = _edges.VerticesInCircle(positionExactlyOnEdge, Epsilon).ToList();
             if (existing.Any())
             {
                 if (existing.First().Equals(v1) || existing.First().Equals(v2))
@@ -240,43 +263,21 @@ namespace RikusGameDevToolbox.Geometry2d
                     // If the vertex is already one of the edge vertices, return it.
                     return existing.First();
                 }
-                throw new InvalidOperationException("Vertex already exists at the position: " + correctedPosition);
+                throw new InvalidOperationException("Vertex already exists at the position: " + positionExactlyOnEdge);
             }
 
 
-            var newVertex = _edges.AddVertex(correctedPosition);
-       
+            var newVertex = _edges.AddVertex(positionExactlyOnEdge);
             _edges.RemoveEdge(v1,v2);
             _edges.AddEdge(v1, newVertex);
             _edges.AddEdge(newVertex, v2);
-            
             Observers.OnSplitEdge?.Invoke(v1, v2, newVertex);
             
             return newVertex;
         }
 
         
-        /// <summary>
-        /// Return the vertices that are within epsilon of the line. The vertices are given in order
-        /// and include the start and the end. 
-        /// </summary>
-        private List<VertexId> VerticesOnLine(VertexId start, VertexId end)
-        {
-            Rect searchArea = RectAroundEdge(start, end);
-            Vector2 startPos = _edges.Position(start);
-            Vector2 endPos = _edges.Position(end);
 
-            var result = _edges.VerticesIn(searchArea)
-                .Where(vertex => !vertex.Equals(start) && !vertex.Equals(end) &&
-                                 GeometryUtils.IsPointOnEdge(_edges.Position(vertex), startPos, endPos, Epsilon))
-                .OrderBy(v => Vector2.Distance(startPos, _edges.Position(v)))
-                .ToList();
-
-            result.Insert(0, start);
-            result.Add(end);
-
-            return result;
-        }
 
         private List<(VertexId v1, VertexId v2)> EdgesWithinEpsilon(Vector2 position)
         {
