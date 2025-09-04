@@ -47,10 +47,7 @@ namespace RikusGameDevToolbox.Geometry2d
         public IEnumerable<Vector2> Vertices => PlanarGraph.Vertices.Select(v => PlanarGraph.Position(v));
         public IEnumerable<(Vector2, Vector2)> Edges => PlanarGraph.Edges
             .Select(edge => (PlanarGraph.Position(edge.Item1), PlanarGraph.Position(edge.Item2)));
-        public List<Vector2> AddLine(Vector2 v1, Vector2 v2) => PlanarGraph.AddLine(v1, v2).Select(id => PlanarGraph.Position(id)).ToList();
-        public void DeleteEdge(Vector2 v1, Vector2 v2) => PlanarGraph.DeleteEdge(v1, v2);
-        public void DeleteVerticesWithoutEdges() => PlanarGraph.DeleteVerticesWithoutEdges();
-        
+
     
 
         #endregion
@@ -60,20 +57,31 @@ namespace RikusGameDevToolbox.Geometry2d
         
         public PlanarDivision(float epsilon = 0.00001f) 
         {
-            PlanarGraph = new PlanarGraph(epsilon)
-            {
-                Observers =
-                {
-                    OnAddVertex = OnAddVertex,
-                    OnAddEdge = OnAddEdge,
-                    OnSplitEdge = OnSplitEdge,
-                    OnDeleteVertex = OnDeleteVertex,
-                    OnDeleteEdge = OnDeleteEdge
-                }
-            };
+            PlanarGraph = new PlanarGraph(epsilon);
             _holes = new PlanarDivisionHoles(_paths, FaceVertexPositions);
         }
         
+        public List<Vector2> AddLine(Vector2 v1, Vector2 v2)
+        {
+            return PlanarGraph.AddLine(v1, v2, OnAddVertex, OnAddEdge, OnSplitEdge, OnDeleteEdge)
+                .Select(id => PlanarGraph.Position(id)).ToList();
+        }
+
+        public void DeleteEdge(Vector2 v1Pos, Vector2 v2Pos)
+        {
+            var v1 = PlanarGraph.VertexAt(v1Pos) ?? throw new ArgumentException("No vertex at given position.");
+            var v2 = PlanarGraph.VertexAt(v2Pos) ?? throw new ArgumentException("No vertex at given position.");
+            
+            PlanarGraph.DeleteEdge(v1, v2);
+            OnDeleteEdge(v1, v2);
+        }
+
+        public void DeleteVerticesWithoutEdges()
+        {
+            PlanarGraph.DeleteVerticesWithoutEdges(OnDeleteVertex);
+        }
+
+
         public FaceId FaceLeftOfEdge(VertexId v1, VertexId v2)
         {
             HalfEdge halfEdge = GetHalfEdge(v1, v2);
@@ -127,7 +135,11 @@ namespace RikusGameDevToolbox.Geometry2d
                                      ?? PathHalfEdges(face2.HalfEdge)
                                          .FirstOrDefault(he => he.Twin.Path is Face face && face.Id != faceId1);
 
-            sharedEdges.ForEach(se => PlanarGraph.DeleteEdge(se.Origin, se.Target));
+            foreach (var sharedEdge in sharedEdges)
+            {
+                PlanarGraph.DeleteEdge(sharedEdge.Origin, sharedEdge.Target);
+                OnDeleteEdge(sharedEdge.Origin, sharedEdge.Target);
+            }
 
             FaceId newFaceId = FaceLeftOfEdge(nonSharedEdge.Origin, nonSharedEdge.Target);
             OnFacesMerged(faceId1, faceId2, newFaceId);
@@ -139,8 +151,11 @@ namespace RikusGameDevToolbox.Geometry2d
             PlanarGraph.Edges
                 .Where(edge => IsEdgeDegenerate(edge.v1, edge.v2))
                 .ToList()
-                .ForEach(edge => PlanarGraph.DeleteEdge(edge.Item1, edge.Item2));
-            return;
+                .ForEach(edge =>
+                {
+                    PlanarGraph.DeleteEdge(edge.Item1, edge.Item2);
+                    OnDeleteEdge(edge.Item1, edge.Item2);
+                });
             
             bool IsEdgeDegenerate(VertexId v1, VertexId v2) => GetHalfEdge(v1, v2).Path == GetHalfEdge(v2, v1).Path;
         }
@@ -157,36 +172,14 @@ namespace RikusGameDevToolbox.Geometry2d
             }
         }
 
-        public bool DeleteVertex(Vector2 position)
+        public bool DeleteVertexAndConnectedEdges(Vector2 position)
         {
             var id = PlanarGraph.VertexAt(position);
             if (id == null) return false;
-            PlanarGraph.DeleteVertex(id.Value);
+            PlanarGraph.DeleteVertexAndConnectedEdges(id.Value, OnDeleteEdge);
             return true;
         }
-        /*
-        public PlanarDivision MakeShallowCopy()
-        {
-            PlanarDivision result = new PlanarDivision(PlanarGraph.Epsilon)
-            {
-                PlanarGraph = PlanarGraph
-            };
-            result.PlanarGraph.Observers.OnAddVertex = result.OnAddVertex;
-            result.PlanarGraph.Observers.OnAddEdge = result.OnAddEdge;
-            result.PlanarGraph.Observers.OnSplitEdge = result.OnSplitEdge;
-            result.PlanarGraph.Observers.OnDeleteVertex = result.OnDeleteVertex;
-            result.PlanarGraph.Observers.OnDeleteEdge = result.OnDeleteEdge;
 
-            result._incidentEdge = _incidentEdge;
-            result._faces = _faces;
-            result._outsideFaces = _outsideFaces;
-            result._paths = _paths;
-            result._holes = new PlanarDivisionHoles(_paths, result.FaceVertexPositions);
-
-          
-            return result;
-        }
-        */
         
         #endregion
         #region ---------------------------------------- PROTECTED METHODS ---------------------------------------------

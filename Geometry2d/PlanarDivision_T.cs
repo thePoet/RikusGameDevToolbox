@@ -26,13 +26,6 @@ namespace RikusGameDevToolbox.Geometry2d
         public PlanarDivision(PlanarDivision planarDivision)
         {
             PlanarGraph = planarDivision.PlanarGraph;
-     
-            PlanarGraph.Observers.OnAddVertex = OnAddVertex;
-            PlanarGraph.Observers.OnAddEdge = OnAddEdge;
-            PlanarGraph.Observers.OnSplitEdge = OnSplitEdge;
-            PlanarGraph.Observers.OnDeleteVertex = OnDeleteVertex;
-            PlanarGraph.Observers.OnDeleteEdge = OnDeleteEdge;
-
             _incidentEdge = planarDivision._incidentEdge;
             _faces = planarDivision._faces;
             _outsideFaces = planarDivision._outsideFaces;
@@ -101,7 +94,11 @@ namespace RikusGameDevToolbox.Geometry2d
                 .Where(he => he.Twin.Path is OutsideFace || (ValuelessFacesAreEmpty && he.Twin.Path is Face twinFace && !FaceHasValue(twinFace.Id)))
                 .ToList();
 
-            edgesToDelete.ForEach(edge => PlanarGraph.DeleteEdge(edge.Origin, edge.Twin.Origin));
+            edgesToDelete.ForEach(edge =>
+            {
+                PlanarGraph.DeleteEdge(edge.Origin, edge.Twin.Origin);
+                OnDeleteEdge(edge.Origin, edge.Twin.Origin);
+            });
         }
         
         /// <summary>
@@ -144,7 +141,7 @@ namespace RikusGameDevToolbox.Geometry2d
             {
                 foreach ((Vector2 p1, Vector2 p2) in polygon.Edges(pathIndex))
                 {
-                    var verticesOnEdge = PlanarGraph.AddLine(p1, p2);
+                    var verticesOnEdge = PlanarGraph.AddLine(p1, p2, OnAddVertex, OnAddEdge, OnSplitEdge, OnDeleteEdge);
                     verticesOnEdges.UnionWith(verticesOnEdge);
                     if (pathIndex == 0)
                     {
@@ -154,11 +151,15 @@ namespace RikusGameDevToolbox.Geometry2d
             }
             
             // Vertices that are inside the polygon, not on the edges will be deleted:
-            PlanarGraph.VerticesIn(polygon.Bounds())
+            var verticesInsidePolygon = PlanarGraph.VerticesIn(polygon.Bounds())
                 .Where(v => polygon.IsPointInside(PlanarGraph.Position(v)) && !verticesOnEdges.Contains(v))
-                .ToList()
-                .ForEach(PlanarGraph.DeleteVertex);
-            
+                .ToList();
+
+            foreach (var vertexId in verticesInsidePolygon)
+            {
+                PlanarGraph.DeleteVertexAndConnectedEdges(vertexId, OnDeleteEdge);
+                OnDeleteVertex(vertexId);
+            }
 
             HashSet<FaceId> facesOnPolygon = new();
             LoopingPairs(verticesOnContour).ToList()
@@ -194,7 +195,7 @@ namespace RikusGameDevToolbox.Geometry2d
         {
             _setDefaultValueForNewFaces = true;
             _defaultValue = value; 
-            PlanarGraph.AddLine(p1, p2);
+            PlanarGraph.AddLine(p1, p2, OnAddVertex, OnAddEdge, OnSplitEdge, OnDeleteEdge);
             _setDefaultValueForNewFaces = false;
         }
         
@@ -307,16 +308,10 @@ namespace RikusGameDevToolbox.Geometry2d
                     .ToHashSet();
                 
                 result.PlanarGraph = PlanarGraph.MakeDeepCopy(preserveVertexIds:true, vertexIdFilter: v => vertices.Contains(v));
-                result.PlanarGraph.Observers.OnAddEdge = result.OnAddEdge;
-                result.PlanarGraph.Observers.OnAddVertex = result.OnAddVertex;
-                result.PlanarGraph.Observers.OnSplitEdge = result.OnSplitEdge;      
-                result.PlanarGraph.Observers.OnDeleteEdge = result.OnDeleteEdge;
-                result.PlanarGraph.Observers.OnDeleteVertex = result.OnDeleteVertex;
-                
       
                 foreach (VertexId vertexId in vertices)
                 {
-                    PlanarGraph.DeleteVertexWithoutCallingObservers(vertexId);
+                    PlanarGraph.DeleteVertexAndConnectedEdges(vertexId);
                     result._incidentEdge.Add(vertexId, _incidentEdge[vertexId]);
                     _incidentEdge.Remove(vertexId);
                 }

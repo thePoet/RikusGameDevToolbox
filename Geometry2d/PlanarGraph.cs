@@ -15,18 +15,6 @@ namespace RikusGameDevToolbox.Geometry2d
     /// </summary>
     public class PlanarGraph
     {
-        public class ObserverMethods
-        {
-            public Action<VertexId> OnAddVertex;
-            public Action<VertexId, VertexId> OnAddEdge;
-            public Action<VertexId, VertexId, VertexId> OnSplitEdge; 
-            public Action<VertexId> OnDeleteVertex;
-            public Action<VertexId, VertexId> OnDeleteEdge;
-        }
-        
-
-        public ObserverMethods Observers = new();
-
         public readonly float Epsilon;
         private IEdgeSpatialCollection _edges = new EdgesSpatial();
 
@@ -41,7 +29,7 @@ namespace RikusGameDevToolbox.Geometry2d
         public Vector2 Position(VertexId vertexId) => _edges.Position(vertexId);
         public VertexId? VertexAt(Vector2 position) => _edges.VerticesInCircle(position, Epsilon).FirstOrDefault();
         public IEnumerable<VertexId> VerticesIn(Rect area) => _edges.VerticesIn(area);
-        public void DeleteEdge(VertexId v1, VertexId v2) => DeleteEdgeBetween(v1, v2);
+        public void DeleteEdge(VertexId v1, VertexId v2) => _edges.RemoveEdge(v1, v2);
         public bool IsEdgeBetween(VertexId a, VertexId b) => _edges.ConnectedVertices(a).Contains(b);
         public void TransformVertices(Func<Vector2, Vector2> transformFunction) => _edges.TransformVertices(transformFunction);
         public IEnumerable<VertexId> ConnectedVertices(VertexId vertexId) => _edges.ConnectedVertices(vertexId);
@@ -60,10 +48,14 @@ namespace RikusGameDevToolbox.Geometry2d
         /// vertices. If the line overlaps with existing edges, these will be incorporated into the line. 
         /// </summary>
         /// <returns>Returns all the vertices on the line. The first is the start and last one is the end.</returns>
-        public List<VertexId> AddLine(Vector2 a, Vector2 b)
+        public List<VertexId> AddLine(Vector2 a, Vector2 b, 
+            Action<VertexId>                      onAddVertex  = null, 
+            Action<VertexId, VertexId>            onAddEdge    = null, 
+            Action<VertexId, VertexId, VertexId>  onSplitEdge  = null, 
+            Action<VertexId, VertexId>            onDeleteEdge = null) // TODO: would be nice to get rid of this, see GetOrAddVertex
         {
-            VertexId va = GetOrAddVertex(a);
-            VertexId vb = GetOrAddVertex(b);
+            VertexId va = GetOrAddVertex(a, onAddVertex, onAddEdge, onSplitEdge, onDeleteEdge);
+            VertexId vb = GetOrAddVertex(b, onAddVertex, onAddEdge, onSplitEdge, onDeleteEdge);
 
             if (va.Equals(vb)) return new List<VertexId>{va};
 
@@ -126,55 +118,44 @@ namespace RikusGameDevToolbox.Geometry2d
                     VertexId v1 = edge.Item1;
                     VertexId v2 = edge.Item2;
                    
-                    VertexId intersectionVertex = InsertOrGetVertexOnEdge(v1, v2, intersectionPos);
+                    VertexId intersectionVertex = InsertOrGetVertexOnEdge(v1, v2, intersectionPos, onSplitEdge);
                    
-                    AddEdge(currentVertex, intersectionVertex);
+                    _edges.AddEdge(currentVertex, intersectionVertex);
+                    onAddEdge?.Invoke(currentVertex, intersectionVertex);
+                  
                     currentVertex = intersectionVertex;
                     intersectionVertices.Add(intersectionVertex);
                 }
-                AddEdge(currentVertex,vertexB);
+                _edges.AddEdge(currentVertex,vertexB);
+                onAddEdge?.Invoke(currentVertex, vertexB);
+               
                 return intersectionVertices;
             }
         }
 
 
-        
-        
-        public void DeleteEdge(Vector2 a, Vector2 b)
-        {
-           if (VertexAt(a) is not VertexId v1 || VertexAt(b) is not VertexId v2)
-                throw new ArgumentException("No vertex at one or both of the given positions while deleting edge.");
-            
-            DeleteEdgeBetween(v1, v2);
-            
-            VertexId? VertexAt(Vector2 position) => _edges.VerticesInCircle(position, Epsilon).FirstOrDefault();
-        }
+
 
         /// <summary>
         /// Destroys the vertex and all edges connected to it.
         /// </summary>
         /// <exception cref="ArgumentException"></exception>
-        public void DeleteVertex(VertexId vertex)
+        public void DeleteVertex(VertexId vertex) // Action on tyhmä tässä
+        {
+            _edges.RemoveVertex(vertex);
+        }
+        
+        public void DeleteVertexAndConnectedEdges(VertexId vertex, Action<VertexId, VertexId> onDeleteEdge = null)
         {
             foreach (var connected in _edges.ConnectedVertices(vertex).ToList())
             {
                 DeleteEdge(vertex, connected);
-            }
-            _edges.RemoveVertex(vertex);
-            Observers.OnDeleteVertex?.Invoke(vertex);
-        }
-        
-        internal void DeleteVertexWithoutCallingObservers(VertexId vertex) // TODO: Hack, remove
-        {
-            foreach (var connected in _edges.ConnectedVertices(vertex).ToList())
-            {
-                _edges.RemoveEdge(vertex, connected);
+                onDeleteEdge?.Invoke(vertex, connected);
             }
             _edges.RemoveVertex(vertex);
         }
-        
 
-        public void DeleteVerticesWithoutEdges()
+        public void DeleteVerticesWithoutEdges(Action<VertexId> onDeleteVertex = null)
         {
             var toBeDeleted = _edges.Vertices()
                 .Where(v =>  !_edges.ConnectedVertices(v).Any())
@@ -182,7 +163,8 @@ namespace RikusGameDevToolbox.Geometry2d
 
             foreach (var id in toBeDeleted)
             {
-                DeleteVertex(id);
+                _edges.RemoveVertex(id);
+                onDeleteVertex?.Invoke(id);
             }
         }
         
@@ -206,7 +188,7 @@ namespace RikusGameDevToolbox.Geometry2d
 
         #region ------------------------------------------ PRIVATE METHODS ----------------------------------------------
 
-        private VertexId GetOrAddVertex(Vector2 position)
+        private VertexId GetOrAddVertex(Vector2 position, Action<VertexId> onAddVertex, Action<VertexId, VertexId> onAddEdge, Action<VertexId, VertexId, VertexId> onSplitEdge, Action<VertexId, VertexId> onDeleteEdge)
         {
             var existing = _edges.VerticesInCircle(position, Epsilon);
             if (existing.Any()) return existing.First();
@@ -215,39 +197,38 @@ namespace RikusGameDevToolbox.Geometry2d
             var edges = EdgesWithinEpsilon(position);
             if (edges.Any())
             {
-                var insertedVertex = InsertOrGetVertexOnEdge(edges.First().v1, edges.First().v2, position);
+                var insertedVertex = InsertOrGetVertexOnEdge(edges.First().v1, edges.First().v2, position, onSplitEdge);
       
                 foreach (var edge in edges.Skip(1))
                 {
                     if (insertedVertex.Equals(edge.v1) || insertedVertex.Equals(edge.v2)) continue;
                     
                     // This may cause some trouble in PlanarDivision because we delete and add instead of splitting the edge.
-                    DeleteEdge(edge.v1, edge.v2);
-                    if (!IsEdgeBetween(edge.v1, insertedVertex)) AddEdge(edge.v1, insertedVertex);
-                    if (!IsEdgeBetween(edge.v2, insertedVertex)) AddEdge(edge.v2, insertedVertex);
+                    _edges.RemoveEdge(edge.v1, edge.v2);
+                    onDeleteEdge?.Invoke(edge.v1, edge.v2);
+
+                    if (!IsEdgeBetween(edge.v1, insertedVertex))
+                    {
+                        _edges.AddEdge(edge.v1, insertedVertex);
+                        onAddEdge?.Invoke(edge.v1, insertedVertex);
+                    }
+                    if (!IsEdgeBetween(edge.v2, insertedVertex))
+                    {
+                        _edges.AddEdge(edge.v2, insertedVertex);
+                        onAddEdge?.Invoke(edge.v2, insertedVertex);
+                    }
                 }
                 return insertedVertex;
             }
 
             var newVertex = _edges.AddVertex(position);
-            Observers.OnAddVertex?.Invoke(newVertex);
+            onAddVertex?.Invoke(newVertex);
             return newVertex;
         }
 
-     
-        private void AddEdge(VertexId vertexA, VertexId vertexB)
-        {
-            _edges.AddEdge(vertexA, vertexB);
-            Observers.OnAddEdge?.Invoke(vertexA, vertexB);
-        }
-        
-        private void DeleteEdgeBetween(VertexId v1, VertexId v2)
-        {
-            _edges.RemoveEdge(v1, v2);
-            Observers.OnDeleteEdge?.Invoke(v1, v2);
-        }
 
-        private VertexId InsertOrGetVertexOnEdge(VertexId v1, VertexId v2, Vector2 position)
+
+        private VertexId InsertOrGetVertexOnEdge(VertexId v1, VertexId v2, Vector2 position, Action<VertexId, VertexId, VertexId> onSplitEdge)
         {
             if (v1.Equals(v2)) throw new ArgumentException("Tried to insert vertex on edge with same vertices");
             
@@ -271,7 +252,7 @@ namespace RikusGameDevToolbox.Geometry2d
             _edges.RemoveEdge(v1,v2);
             _edges.AddEdge(v1, newVertex);
             _edges.AddEdge(newVertex, v2);
-            Observers.OnSplitEdge?.Invoke(v1, v2, newVertex);
+            onSplitEdge?.Invoke(v1, v2, newVertex);
             
             return newVertex;
         }

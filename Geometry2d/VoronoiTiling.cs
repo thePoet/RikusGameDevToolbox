@@ -74,7 +74,7 @@ namespace RikusGameDevToolbox.Geometry2d
                     // Delete vertices outside the polygon
                     foreach (Vector2 v in edgeVertices)
                     {
-                        if (!cookieCutter.IsPointInside(v) && !cookieCutter.IsPointOnEdge(v))  division.DeleteVertex(v);
+                        if (!cookieCutter.IsPointInside(v) && !cookieCutter.IsPointOnEdge(v))  division.DeleteVertexAndConnectedEdges(v);
                     }
                 }
                 return division;
