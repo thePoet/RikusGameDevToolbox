@@ -1,0 +1,92 @@
+
+using System.Collections;
+using System.Collections.Generic;
+using System.Linq;
+using Clipper2Lib;
+using UnityEngine;
+
+namespace RikusGameDevToolbox.Geometry2d
+{
+    /*
+    public class PathVector2 
+    {
+        private readonly Vector2[] _points;
+
+        public PathVector2(IEnumerable<Vector2> points)
+        {
+            _points = points.ToArray();
+        }
+        
+        public int Count => _points.Length;
+        
+        public Vector2 this[int i] => _points[i];
+        
+    }*/
+    
+    
+    /// <summary>
+    /// Utility functions for working with paths of polygons
+    /// </summary>
+    public static class PathUtils
+    {
+        /// <summary>
+        /// Return the lenght of the path (which is considered a closed loop).
+        /// </summary>
+        public static float Length(Vector2[] path)
+        {
+            float length = 0;
+            for (int i = 0; i < path.Length; i++)
+            {
+                int nextIndex = (i + 1) % path.Length;
+                length += Vector2.Distance(path[i], path[nextIndex]);
+            }
+            return length;
+        }
+
+        /// <summary>
+        /// Returns the pairs of vertex positions on a path. The last pair is the last and the first vertex.
+        /// </summary>
+        public static IEnumerable<(Vector2, Vector2)> VertexPairs(IEnumerable<Vector2> path)
+        {
+            int count = path.Count();
+            for (int i = 0; i < count; i++)
+            {
+                yield return i == count - 1
+                    ? (path.ElementAt(i), path.ElementAt(0))
+                    : (path.ElementAt(i), path.ElementAt(i + 1));
+            }
+        }
+       
+        public static string AsString(Vector2[] path)
+        {
+            return string.Join(" -> ", path.Select(p => $"({p.x}, {p.y})"));
+        }
+
+        public static bool IsCounterClockwise(Vector2[] path) => IsCounterClockwise(ToPathD(path));
+        
+        public static bool IsClockWise(Vector2[] path) => IsClockwise(ToPathD(path));
+
+        public static bool IsPointOn(Vector2 point, IEnumerable<Vector2> path, float maxDistance)
+        {
+            foreach ( (Vector2 edgeStart, Vector2 edgeEnd) in VertexPairs(path))
+            {
+                if (GeometryUtils.IsPointOnEdge(point, edgeStart, edgeEnd, maxDistance)) return true;
+            }
+            return false;
+        }
+        
+        
+        internal static Vector2[] ToVector2Array(PathD path)
+        {
+            return path.Select(p => new Vector2((float)p.x, (float)p.y)).ToArray();
+        }
+        
+        internal static bool IsCounterClockwise(PathD path) => Clipper.IsPositive(path);
+        internal static bool IsClockwise(PathD path) => !Clipper.IsPositive(path);
+        
+        internal static PathD ToPathD(IEnumerable<Vector2> points) => new (points.Select(ToPointD));
+
+        private static PointD ToPointD(Vector2 point) => new (point.x, point.y);
+
+    }
+}

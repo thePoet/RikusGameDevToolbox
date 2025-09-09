@@ -100,7 +100,7 @@ namespace RikusGameDevToolbox.GeneralUse
 
             if (_numEntitiesInSquare[cellIndex] >= _maxNumEntitiesInSquare)
             {
-                Debug.LogWarning("Too many entities in square");
+                Debug.LogWarning("Too many entities in square at " + position );
                 return;
             }
 

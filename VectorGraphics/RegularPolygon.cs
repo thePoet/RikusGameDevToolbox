@@ -14,7 +14,7 @@ namespace RikusGameDevToolbox.VectorGraphics
         //public int roundedCornerVertices = 0;
 
 
-        protected override void UpdateLineRenderer()
+        public override void UpdateLineRenderer()
         {
             base.UpdateLineRenderer();
             SetVertices( Vertices(radius, numSides) );

@@ -6,27 +6,14 @@ using UnityEngine;
 
 namespace RikusGameDevToolbox.Geometry2d
 {
+    //TODO: Remove this class, move functionality to Polygon
     public class PolygonWithHoles : Polygon
     {
-        ///Returns vertices of a hole in CW order
-       // public Vector2[] Hole(int index) => Paths[index+1].Select(p => new Vector2((float)p.x, (float)p.y)).ToArray();
         
-       // public SimplePolygon Hole(int index) => new SimplePolygon(Paths[index+1]);
-        
-        public int NumHoles => Mathf.Max(0, Paths.Count - 1);
-
-        public SimplePolygon Hole(int holeIndex)
+        internal PolygonWithHoles(PathsD pathsD)
         {
-            if (holeIndex < 0 || holeIndex >= NumHoles) return null;
-            PathD path = new PathD(Paths[holeIndex + 1]);
-            path.Reverse();
-            return new SimplePolygon(path);
-        }
-        
-        internal PolygonWithHoles(PathsD paths)
-        {
-            int numOutlines = paths.Count(Clipper.IsPositive);
-            int numHoles = paths.Count(path => !Clipper.IsPositive(path));
+            int numOutlines = pathsD.Count(Clipper.IsPositive);
+            int numHoles = pathsD.Count(path => !Clipper.IsPositive(path));
             
             if (numOutlines != 1 || numHoles < 1)
             {
@@ -35,18 +22,20 @@ namespace RikusGameDevToolbox.Geometry2d
             
             //NOTE: We don't check if the holes are inside the outline
             
-            ArrangePathsContourFirst(paths);
-            Paths = paths;
+            ArrangePathsContourFirst(pathsD);   // Is this necessary or is contour always first?
+            PathsD = pathsD;
+            
+       
+            void ArrangePathsContourFirst(PathsD paths)
+            {
+                int contourIndex = paths.FindIndex(Clipper.IsPositive);
+                if (contourIndex != 0)
+                {
+                    (paths[contourIndex], paths[0]) = (paths[0], paths[contourIndex]);
+                }
+            }
          }
         
-        // Is this necessary or is contour always first?
-        void ArrangePathsContourFirst(PathsD paths)
-        {
-            int contourIndex = paths.FindIndex(Clipper.IsPositive);
-            if (contourIndex != 0)
-            {
-                (paths[contourIndex], paths[0]) = (paths[0], paths[contourIndex]);
-            }
-        }
+        
     }
 }

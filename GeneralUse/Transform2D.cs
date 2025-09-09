@@ -10,12 +10,10 @@ namespace RikusGameDevToolbox.GeneralUse
         {
             private Matrix4x4 _transformation;
             /// <summary>
-            /// Creates a Transform2D based on a function.  
+            /// Creates a Transform2D based on a function that does the same transformation.
             /// </summary>
             public static Transform2D From(Func<Vector2, Vector2> f)
             {
-  
-
                 return new Transform2D
                 {
                     _transformation = TransformationMatrix(f)

@@ -54,6 +54,8 @@ namespace RikusGameDevToolbox.GeneralUse
         {
             return Mathf.DeltaAngle(angleFrom, angleTo);
         }
+        
+        
 
         /// <summary>
         /// Circular mean is the average of then angles that takes into account the circular nature of angles i.e.

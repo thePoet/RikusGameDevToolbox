@@ -1,5 +1,7 @@
 using System.Collections.Generic;
+using System.Linq;
 using Clipper2Lib;
+using UnityEngine;
 
 
 namespace RikusGameDevToolbox.Geometry2d
@@ -14,10 +16,10 @@ namespace RikusGameDevToolbox.Geometry2d
         {
             PolyTreeD polytree = new();
             ClipperD clipper = new();
-            clipper.AddSubject(a.Paths);
-            clipper.AddSubject(b.Paths);
+            clipper.AddSubject(a.PathsD);
+            clipper.AddSubject(b.PathsD);
             clipper.Execute(ClipType.Union, FillRule.NonZero, polytree);
-            return PolygonTools.ToPolygons(polytree);
+            return GeometryUtils.ToPolygons(polytree);
         }
 
         
@@ -30,10 +32,10 @@ namespace RikusGameDevToolbox.Geometry2d
             ClipperD clipper = new();
             foreach (var polygon in polygons)
             {
-                clipper.AddSubject(polygon.Paths);
+                clipper.AddSubject(polygon.PathsD);
             }
             clipper.Execute(ClipType.Union, FillRule.NonZero, polytree);
-            return PolygonTools.ToPolygons(polytree);
+            return GeometryUtils.ToPolygons(polytree);
         }
         
         /// <summary>
@@ -44,10 +46,10 @@ namespace RikusGameDevToolbox.Geometry2d
         {
             PolyTreeD polytree = new();
             ClipperD clipper = new();
-            clipper.AddSubject(a.Paths);
-            clipper.AddClip(b.Paths);
+            clipper.AddSubject(a.PathsD);
+            clipper.AddClip(b.PathsD);
             clipper.Execute(ClipType.Intersection, FillRule.NonZero, polytree);
-            return PolygonTools.ToPolygons(polytree);
+            return GeometryUtils.ToPolygons(polytree);
         }
 
         /// <summary>
@@ -57,10 +59,10 @@ namespace RikusGameDevToolbox.Geometry2d
         {
             PolyTreeD polytree = new();
             ClipperD clipper = new();
-            clipper.AddSubject(poly1.Paths);
-            clipper.AddClip(poly2.Paths);
+            clipper.AddSubject(poly1.PathsD);
+            clipper.AddClip(poly2.PathsD);
             clipper.Execute(ClipType.Difference, FillRule.NonZero, polytree);
-            return PolygonTools.ToPolygons(polytree);
+            return GeometryUtils.ToPolygons(polytree);
         }
         
         /// <summary>
@@ -72,16 +74,67 @@ namespace RikusGameDevToolbox.Geometry2d
             ClipperD clipper = new();
             foreach (var polygon in poly1)
             {
-                clipper.AddSubject(polygon.Paths);
+                clipper.AddSubject(polygon.PathsD);
             }
             foreach (var polygon in poly2)
             {
-                clipper.AddClip(polygon.Paths);
+                clipper.AddClip(polygon.PathsD);
             }
             clipper.Execute(ClipType.Difference, FillRule.NonZero, polytree);
-            return PolygonTools.ToPolygons(polytree);
+            return GeometryUtils.ToPolygons(polytree);
         }
 
+        /// <summary>
+        /// If polygon has a point that lies on the edge of the other polygon, this inserts a mathing point to the
+        /// edge if one does not already exist.
+        /// Horribly inefficient, use only for small polygons!!!
+        /// </summary>
+        public static void MatchPoints(Polygon poly1, Polygon poly2, float tolerance)
+        {
+            MatchPaths(poly1.PathsD, poly2.PathsD);
+            MatchPaths(poly2.PathsD, poly1.PathsD);
+
+            void MatchPaths(PathsD a, PathsD b)
+            {
+                foreach (PathD aPath in a)
+                {
+                    foreach (var aPoint in aPath)
+                    {
+                        foreach (PathD bPath in b)
+                        {
+                            Match(aPoint, bPath);
+                        }
+                    }
+                }
+            }
+
+            void Match(PointD point, PathD path)
+            {
+                if (path.Any(dp => DistanceWithinTolerance(dp, point))) return;
+
+                for (int i = 0; i < path.Count; i++)
+                {
+                    PointD edge1 = path[i];
+                    int nextIndex = (i + 1) % path.Count;
+                    PointD edge2 = path[nextIndex];
+
+                    if (GeometryUtils.IsPointOnEdge(ToVector2(point), ToVector2(edge1), ToVector2(edge2), tolerance))
+                    {
+                        path.Insert(nextIndex, point);
+                        break;
+                    }
+                }
+            }
+
+
+            bool DistanceWithinTolerance(PointD a, PointD b)
+            {
+                return Vector2.Distance(ToVector2(a), ToVector2(b)) <= tolerance;
+            }
+
+            Vector2 ToVector2(PointD point) => new((float)point.x, (float)point.y);
+        }
+        
         #endregion
     }
 }

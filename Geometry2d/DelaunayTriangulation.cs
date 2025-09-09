@@ -9,11 +9,11 @@ namespace RikusGameDevToolbox.Geometry2d
     public class DelaunayTriangulation
     {
         public List<Triangle> Triangles => _triangles;
-        public List<Edge> Edges => _edges;
+        public List<DelaunayEdge> Edges => _edges;
         public List<Vector2> Points => _points;
 
         private List<Triangle> _triangles;
-        private List<Edge> _edges;
+        private List<DelaunayEdge> _edges;
         private List<Vector2> _points;
         private Dictionary<Triangle, List<Triangle>> _triangleNeighbors;
         
@@ -40,9 +40,9 @@ namespace RikusGameDevToolbox.Geometry2d
             return triangles;
         }
         
-        private List<Edge> CreateEdges(List<Triangle> triangles)
+        private List<DelaunayEdge> CreateEdges(List<Triangle> triangles)
         {
-            var edges = new HashSet<Edge>();
+            var edges = new HashSet<DelaunayEdge>();
             foreach (var triangle in triangles)
             {
                 foreach (var edge in triangle.Edges)

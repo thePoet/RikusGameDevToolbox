@@ -12,39 +12,7 @@ namespace RikusGameDevToolbox.Geometry2d
     [Serializable]
     public class SimplePolygon : Polygon, IEquatable<SimplePolygon>
     {
-        [SerializeField]
-        private List<Vector2> _points;
-        private const float Epsilon = 0.01f;
-
         #region ------------------------------------------ PUBLIC METHODS -----------------------------------------------
-        
-        /// <summary>
-        /// Inflates/deflates the polygon by the given amount. 
-        /// Creates new polygon(s) so that their outline is parallel to original
-        /// The resulting list of polygons are sorted by area in descending order.
-        /// </summary>
-        /// <param name="simplePolygon"></param>
-        /// <param name="amount">Distance between old and new outline.</param>
-        /// <returns>List of resulting polygons descending from the largest by area.</returns>
-       /*
-        public static List<SimplePolygon> Inflate(SimplePolygon simplePolygon, float amount)
-        {
-            var paths = Clipper.InflatePaths(simplePolygon.Paths, amount, JoinType.Miter, EndType.Polygon);
-            List<SimplePolygon> result = new List<SimplePolygon>();
-            foreach(var pathd in paths)
-            {
-                result.Add(new SimplePolygon(pathd));
-            }
-            SortByAreaDescending(result);
-            return result;
-            
-            
-            void SortByAreaDescending(List<SimplePolygon> list)
-            {
-                list.Sort((a, b) => b.Area.CompareTo(a.Area));
-            }
-
-        }*/
 
         /// <summary>
         /// Constructor for a polygon with the given points. 
@@ -55,48 +23,42 @@ namespace RikusGameDevToolbox.Geometry2d
             SetPoints(points);
         }
         
-        public void SetContour(IEnumerable<Vector2> points)
+        public void SetShape(IEnumerable<Vector2> points)
         {
             SetPoints(points);
         }
-
-
          
         public bool IsIntersecting(SimplePolygon other)
         {
             var polygon = this;
-            return _points.Any(p => other.IsPointInside(p) || other.IsPointOnEdge(p)) || 
-                   other._points.Any(p => polygon.IsPointInside(p) || polygon.IsPointOnEdge(p));
+            return Contour.Any(p => other.IsPointInside(p) || other.IsPointOnEdge(p)) || 
+                   other.Contour.Any(p => polygon.IsPointInside(p) || polygon.IsPointOnEdge(p));
         }
-
-
 
         /// <summary>
         /// Return true if all the points of this polygon are inside or on the edge of the other polygon. 
         /// </summary>
         public bool IsInsideOf(Polygon other)
         {
-            return _points.All(p=> other.IsPointInside(p) || other.IsPointOnEdge(p));
+            return Contour.All(p=> other.IsPointInside(p) || other.IsPointOnEdge(p));
         }
-  
- 
 
-        public bool IsSharingVerticesWith(SimplePolygon other)
+        public bool IsSharingVerticesWith(SimplePolygon other, float epsilon)
         {
-           return _points.Any(point1 => other._points.Any(point2 => SamePoint(point1,point2)));
-           
-           bool SamePoint(Vector2 p1, Vector2 p2) => Vector2.Distance(p1, p2) < Epsilon;
+           return Contour.Any(point1 => other.Contour.Any(point2 => SamePoint(point1,point2)));
+
+           bool SamePoint(Vector2 p1, Vector2 p2) => Vector2.Distance(p1, p2) < epsilon;
         }
         
      
 
         public bool IsConvex()
         {
-            for (int i = 0; i < _points.Count; i++)
+            for (int i = 0; i < Contour.Length; i++)
             {
-                Vector2 p0 = _points[i];
-                Vector2 p1 = _points[(i + 1) % _points.Count];
-                Vector2 p2 = _points[(i + 2) % _points.Count];
+                Vector2 p0 = Contour[i];
+                Vector2 p1 = Contour[(i + 1) % Contour.Length];
+                Vector2 p2 = Contour[(i + 2) % Contour.Length];
 
                 Vector2 v1 = p1 - p0;
                 Vector2 v2 = p2 - p1;
@@ -124,7 +86,7 @@ namespace RikusGameDevToolbox.Geometry2d
 
         public SimplePolygon MakeCopy()
         {
-            return new SimplePolygon(_points);
+            return new SimplePolygon(Contour);
         }
 
         /// <summary>
@@ -132,31 +94,18 @@ namespace RikusGameDevToolbox.Geometry2d
         /// </summary>
         public SimplePolygon ForEachPoint(Func<Vector2, Vector2> func)
         {
-            return new SimplePolygon(_points.Select(func));
+            return new SimplePolygon(Contour.Select(func));
         }
 
-        public int NumSharedVerticesWith(SimplePolygon other)
-        {
-            //Todo: Make more efficient
-            int result = 0;
-            foreach (var myPoint in _points)
-            {
-                foreach (var theirPoint in other._points)
-                {
-                    if (myPoint==theirPoint) result++;
-                }
-            }
-            return result;
-        }
         
         public Vector2 AverageOfPoints()
         {
             Vector2 sum = Vector2.zero;
-            foreach (var point in _points)
+            foreach (var point in Contour)
             {
                 sum += point;
             }
-            return sum / _points.Count;
+            return sum / Contour.Length;
         }
         
         public Vector2 Centroid()
@@ -166,14 +115,14 @@ namespace RikusGameDevToolbox.Geometry2d
             var centroid = Vector2.zero;
             float area = 0;
 
-            for (int i = 0; i < _points!.Count; i++)
+            for (int i = 0; i < Contour!.Length; i++)
             {
-                int i2 = i == _points.Count - 1 ? 0 : i + 1;
+                int i2 = i == Contour.Length - 1 ? 0 : i + 1;
 
-                float xi = _points[i].x;
-                float yi = _points[i].y;
-                float xi2 = _points[i2].x;
-                float yi2 = _points[i2].y;
+                float xi = Contour[i].x;
+                float yi = Contour[i].y;
+                float xi2 = Contour[i2].x;
+                float yi2 = Contour[i2].y;
 
                 float mult = (xi * yi2 - xi2 * yi) / 3f;
         
@@ -192,9 +141,7 @@ namespace RikusGameDevToolbox.Geometry2d
                     area += addArea;
                 }
             }
-          
             centroid /= area;
-
             return centroid;
         }
         
@@ -203,56 +150,33 @@ namespace RikusGameDevToolbox.Geometry2d
         public bool Equals(SimplePolygon other)
         {
             if (other == null) return false;
-            bool sameNumberOfPoints = _points.Count == other._points.Count;
-            bool samePoints = _points.All(point => other._points.Contains(point));
+            bool sameNumberOfPoints = Contour.Length == other.Contour.Length;
+            bool samePoints = Contour.All(point => other.Contour.Contains(point));
             return sameNumberOfPoints && samePoints;
         }
         
-
-    
-        
         #endregion
-        
         #region ----------------------------------------- INTERNAL METHODS ---------------------------------------------
 
         internal SimplePolygon(PathD path)
         {
-            if (!Clipper.IsPositive(path))
+            if (PathUtils.IsClockwise(path))
             {
                  Debug.LogError("Wrong winding order for creating SimplePolygon from pathD.");
             }
             // make copy of path
             PathD pathCopy = new PathD(path);
-            Paths = new PathsD { pathCopy };
-            _points = new List<Vector2>();
-            foreach (var point in Paths[0])
-            {
-                _points.Add(new Vector2((float)point.x, (float)point.y));
-            }
+            PathsD = new PathsD { pathCopy };
         }
         #endregion
         #region ------------------------------------------ PRIVATE METHODS ----------------------------------------------
-        
       
         private void SetPoints(IEnumerable<Vector2> points)
         {
-            _points = new List<Vector2>(points);
-            if (_points.Count() < 3)
-            {
-                throw new ArgumentException("A polygon must have at least 3 sides.");
-            }
-            var path = ToPathD(_points);
-            if (!Clipper.IsPositive(path)) throw new ArgumentException("Polygon's points must be given in counter-clockwise order.");
-            Paths = new PathsD { path };
+            var path = PathUtils.ToPathD(points);
+            if (PathUtils.IsClockwise(path)) throw new ArgumentException("Polygon's points must be given in counter-clockwise order.");
+            PathsD = new PathsD { path };
         }
-           
-
-
-
-
-   
-
-
         #endregion
 
         

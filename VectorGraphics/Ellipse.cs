@@ -11,7 +11,7 @@ namespace RikusGameDevToolbox.VectorGraphics
         public float b = 3f;
 
 
-        protected override void UpdateLineRenderer()
+        public override void UpdateLineRenderer()
         {
             base.UpdateLineRenderer();
             SetVertices( Vertices() );

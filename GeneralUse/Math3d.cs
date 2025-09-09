@@ -32,7 +32,7 @@ namespace RikusGameDevToolbox.GeneralUse
         // polar angle of vector in degrees 
         public static float PolarAngle(Vector3 vector)
         {
-            return -Math2d.GetAngle(Vector2.up, new Vector2(vector.x, vector.z));
+            return -Vector2.SignedAngle(Vector2.up, new Vector2(vector.x, vector.z));
         }
 
         public static float PolarAngleFromTo(Vector3 startPosition, Vector3 endPosition)

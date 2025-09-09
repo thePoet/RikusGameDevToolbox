@@ -18,7 +18,7 @@ namespace RikusGameDevToolbox.VectorGraphics
             UpdateLineRenderer();
         }
 
-        protected override void UpdateLineRenderer()
+        public override void UpdateLineRenderer()
         {
             base.UpdateLineRenderer();
             SetVertices( Vertices() );

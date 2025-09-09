@@ -14,10 +14,10 @@ namespace RikusGameDevToolbox.Geometry2d
             var tempGameObject = new GameObject();
    
             var collider = tempGameObject.AddComponent<PolygonCollider2D>();
-            collider.pathCount = polygon.Paths.Count;
-            for (int i = 0; i < polygon.Paths.Count; i++)
+            collider.pathCount = polygon.PathsD.Count;
+            for (int i = 0; i < polygon.PathsD.Count; i++)
             {
-                collider.SetPath(i, polygon.Paths[i].Select(p => new Vector2((float)p.x, (float)p.y)).ToArray());
+                collider.SetPath(i, polygon.PathsD[i].Select(p => new Vector2((float)p.x, (float)p.y)).ToArray());
             }
             var mesh = collider.CreateMesh(false, false);
 

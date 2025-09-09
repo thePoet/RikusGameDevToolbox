@@ -7,7 +7,7 @@ using UnityEngine;
 
 namespace RikusGameDevToolbox.Geometry2d
 {
-    public static class PolygonTools
+    public static class GeometryUtils
     {
         // An intersection of the outlines of two Polygon2D:s.
         private struct OutlineIntersection
@@ -18,20 +18,15 @@ namespace RikusGameDevToolbox.Geometry2d
             public bool IsStartOfIntersectingArea; // In CCW direction
             public override string ToString() => $"Intersection of {PointIdx1} and {PointIdx2} at {IntersectionPosition} is start: {IsStartOfIntersectingArea}"; 
         }
-        
-        
-        /// <summary>
-        /// Creates a regular polygon with the given number of sides and radius.
-        /// </summary>
-        public static SimplePolygon CreateRegular(int numSides, float radius)
+
+
+        public static bool IsClockwise(IEnumerable<Vector2> points)
         {
-            var points = new Vector2[numSides];
-            for (int i = 0; i < numSides; i++)
-            {
-                points[i] = new Vector2(Mathf.Cos(2 * Mathf.PI * i / numSides), 
-                    Mathf.Sin(2 * Mathf.PI * i / numSides)) * radius;
-            }
-            return new SimplePolygon(points);
+            var path = ToPathD(points);
+            return !Clipper.IsPositive(path);
+            
+            PathD ToPathD(IEnumerable<Vector2> points) => new (points.Select(ToPointD)); 
+            PointD ToPointD(Vector2 point) => new (point.x, point.y);
         }
         
         
@@ -53,8 +48,8 @@ namespace RikusGameDevToolbox.Geometry2d
             
             int SortByAngle(Vector2 p1, Vector2 p2)
             {
-                float angle1 = Math2d.GetAngle(Vector2.up, p1-center);
-                float angle2 = Math2d.GetAngle(Vector2.up, p2-center);
+                float angle1 = Vector2.SignedAngle(Vector2.up, p1-center);
+                float angle2 = Vector2.SignedAngle(Vector2.up, p2-center);
                 return angle1.CompareTo(angle2);
             }
    
@@ -125,6 +120,88 @@ namespace RikusGameDevToolbox.Geometry2d
             }
         }
          
+         /// <summary>
+         /// Returns true if point is within the given distance from a line segment.
+         /// </summary>
+         /// <param name="point"></param>
+         /// <param name="edgeStart"></param>
+         /// <param name="edgeEnd"></param>
+         /// <param name="epsilon"></param>
+         /// <returns></returns>
+        public static bool IsPointOnEdge(Vector2 point, Vector2 edgeStart, Vector2 edgeEnd, float epsilon)
+        {
+            return IsPointsProjectionOnEdge(point, edgeStart, edgeEnd) &&
+                   PointsDistanceFromLine(point, edgeStart, edgeEnd) < epsilon;
+            
+            bool IsPointsProjectionOnEdge(Vector2 p, Vector2 a, Vector2 b)
+            {
+                float dotProduct = Vector2.Dot(p - a, b - a);
+                return dotProduct >= 0 && dotProduct <= (b-a).sqrMagnitude;
+            }
+
+            float PointsDistanceFromLine(Vector2 p, Vector2 a, Vector2 b)
+            {
+                Vector2 rejection = (p - a).RejectionOn(b - a);
+                return rejection.magnitude;
+            }
+        }
+         
+         public static Vector2 ProjectPointOnEdge(Vector2 point, Vector2 edgeStart, Vector2 edgeEnd)
+         {
+             Vector2 edgeVector = edgeEnd - edgeStart;
+             Vector2 pointVector = point - edgeStart;
+             float t = Vector2.Dot(pointVector, edgeVector) / edgeVector.sqrMagnitude;
+             t = Mathf.Clamp01(t);
+             return edgeStart + t * edgeVector;
+         }
+         
+        /// <summary>
+        /// Returns true if the two line segments overlap i.e. they are collinear and at least one of the endpoints
+        /// is on the other segment.
+        /// </summary>
+        /// <param name="s1Start"></param>
+        /// <param name="s1End"></param>
+        /// <param name="s2Start"></param>
+        /// <param name="s2End"></param>
+        /// <param name="tolerance"></param>
+        /// <returns></returns>
+        public static bool AreLineSegmentsOverlapping(Vector2 s1Start, Vector2 s1End, Vector2 s2Start, Vector2 s2End,
+            float tolerance = 1e-5f)
+        {
+            if (!AreLinesCollinear(s1Start, s1End, s2Start, s2End)) return false;
+
+            return IsPointOnEdge(s1Start, s2Start, s2End, tolerance) ||
+                   IsPointOnEdge(s1End, s2Start, s2End, tolerance) ||
+                   IsPointOnEdge(s2Start, s1Start, s1End, tolerance) ||
+                   IsPointOnEdge(s2End, s1Start, s1End, tolerance);
+                  
+            
+            // Helper functions
+            bool Approximately(float a, float b) => Mathf.Abs(a - b) <= tolerance;
+
+            
+        }
+        
+        /// <summary>
+        /// Return true if the two lines are collinear.
+        /// </summary>
+        /// <param name="a1">Point on line A</param>
+        /// <param name="a2">Another point on line A</param>
+        /// <param name="b1">Point on line B</param>
+        /// <param name="b2">Another point on line B</param>
+        /// <returns></returns>
+        public static bool AreLinesCollinear(Vector2 a1, Vector2 a2, Vector2 b1, Vector2 b2)
+        {
+            var r = a2 - a1;
+            var s = b2 - b1;
+            return Mathf.Abs(CrossProduct2D(r, s)) < 1e-5f ;
+        }
+        
+        private static float CrossProduct2D(Vector2 a, Vector2 b)
+        {
+            return a.x * b.y - a.y * b.x;
+        }
+         
         internal static List<Polygon> ToPolygons(PolyTreeD tree)
         {
             var result = new List<Polygon>();
@@ -163,7 +240,15 @@ namespace RikusGameDevToolbox.Geometry2d
             
         }
 
-         
+        internal static PolyTreeD ToPolyTree(PathsD paths)
+        {
+            PolyTreeD polytree = new();
+            ClipperD clipper = new();
+            clipper.AddSubject(paths);
+            clipper.Execute(ClipType.Union, FillRule.NonZero, polytree);
+            return polytree;
+        }
+
         private static List<OutlineIntersection> OutlineIntersections(SimplePolygon a, SimplePolygon b)
         {
             List<OutlineIntersection> intersections = new List<OutlineIntersection>();
@@ -172,12 +257,13 @@ namespace RikusGameDevToolbox.Geometry2d
             {
                 foreach ((int b1, int b2) in PointIndicesForEdges(b))
                 {
-                    var result = Math2d.LineSegmentIntersection(a.Contour[a1], a.Contour[a2], b.Contour[b1], b.Contour[b2]);
-                    if (result.AreIntersecting)
-                    {
+                    Vector2? intersection =
+                        Intersection.LineSegmentPosition(a.Contour[a1], a.Contour[a2], b.Contour[b1], b.Contour[b2]);
+                    if (intersection.HasValue)
+                    {   
                         intersections.Add(new OutlineIntersection
                         {
-                            IntersectionPosition = result.intersectionPoint,
+                            IntersectionPosition = intersection.Value,
                             PointIdx1 = a1,
                             PointIdx2 = a2,
                             IsStartOfIntersectingArea = Math2d.IsPointLeftOfLine(b.Contour[b1], a.Contour[a1], a.Contour[a2])
@@ -189,7 +275,7 @@ namespace RikusGameDevToolbox.Geometry2d
             if (intersections.Count % 2 == 1)
             {
                 
-                Debug.LogError("Odd number of intersection. shared vertices: " + a.NumSharedVerticesWith(b));
+                Debug.LogError("Odd number of intersection.");
                 
                 intersections.Clear();
             }
@@ -217,6 +303,10 @@ namespace RikusGameDevToolbox.Geometry2d
                 yield return i == polygon.Contour.Length - 1 ? (i, 0) : (i, i + 1);
             }
         }
+        
+        
+        
+        
 
     }
 }

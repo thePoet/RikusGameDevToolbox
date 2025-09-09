@@ -11,7 +11,7 @@ namespace RikusGameDevToolbox.VectorGraphics
         public float addendum = 0.3f;
         public float dedendum = 0.3f;
 
-        protected override void UpdateLineRenderer()
+        public override void UpdateLineRenderer()
         {
             base.UpdateLineRenderer();
 

@@ -61,7 +61,7 @@ namespace RikusGameDevToolbox.VectorGraphics
             }*/
         }
         
-        protected virtual void UpdateLineRenderer()
+        public virtual void UpdateLineRenderer()
         {
             var line = GetComponent<LineRenderer>();
             
