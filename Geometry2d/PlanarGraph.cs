@@ -247,7 +247,7 @@ namespace RikusGameDevToolbox.Geometry2d
                     // If the vertex is already one of the edge vertices, return it.
                     return existing.First();
                 }
-                throw new InvalidOperationException("Vertex already exists at the position: " + positionExactlyOnEdge);
+               Debug.LogWarning("Vertex already exists at the position: " + positionExactlyOnEdge);
             }
 
 

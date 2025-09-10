@@ -111,7 +111,7 @@ namespace RikusGameDevToolbox.Geometry2d
                 foreach (var v in edgeVertices)
                 {
                     var vPos = graph.Position(v);
-                    if (!cookieCutter.IsPointInside(vPos) && !cookieCutter.IsPointOnEdge(vPos))  graph.DeleteVertex(v);
+                    if (!cookieCutter.IsPointInside(vPos) && !cookieCutter.IsPointOnEdge(vPos))  graph.DeleteVertexAndConnectedEdges(v);
                 }
             }
             return graph;
