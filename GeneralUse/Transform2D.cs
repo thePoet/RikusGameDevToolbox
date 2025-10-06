@@ -42,6 +42,15 @@ namespace RikusGameDevToolbox.GeneralUse
                 }
                 
             }
+            
+            public override string ToString()
+            {
+                return $"Transform2D Matrix:\n" +
+                       $"[{_transformation[0,0]}, {_transformation[0,1]}, {_transformation[0,2]}, {_transformation[0,3]}]\n" +
+                       $"[{_transformation[1,0]}, {_transformation[1,1]}, {_transformation[1,2]}, {_transformation[1,3]}]\n" +
+                       $"[{_transformation[2,0]}, {_transformation[2,1]}, {_transformation[2,2]}, {_transformation[2,3]}]\n" +
+                       $"[{_transformation[3,0]}, {_transformation[3,1]}, {_transformation[3,2]}, {_transformation[3,3]}]";
+            }
 
 
             public Vector2 TransformPoint(Vector2 point) => _transformation.MultiplyPoint3x4(point);
