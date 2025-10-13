@@ -105,7 +105,9 @@ namespace RikusGameDevToolbox.Geometry2d
             }
         }
 
-        
+        /// <summary>
+        /// This function removes vertices that are less than the tolerance distance from an imaginary line that passes through its 2 adjacent vertices        
+        /// </summary>
         public void Simplify(float tolerance)
         {
             PathsD = Clipper.SimplifyPaths(PathsD, tolerance);
